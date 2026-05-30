@@ -15,6 +15,14 @@ if (!device) {
 function saveDevice() { localStorage.setItem(ID_KEY, JSON.stringify(device)); }
 saveDevice();
 const isLocalhost = ["localhost", "127.0.0.1"].includes(location.hostname);
+const AUTH_KEY = "ferry_token";
+const startupUrl = new URL(location.href);
+let authToken = startupUrl.searchParams.get("token") || localStorage.getItem(AUTH_KEY) || "";
+if (startupUrl.searchParams.get("token")) {
+  localStorage.setItem(AUTH_KEY, authToken);
+  startupUrl.searchParams.delete("token");
+  history.replaceState(null, "", startupUrl.pathname + startupUrl.search + startupUrl.hash);
+}
 
 const $ = (s) => document.querySelector(s);
 const thread = $("#thread");
@@ -25,6 +33,7 @@ const scrollArea = $("#scrollableArea");
 
 let cachedMessages = [];   // for cleanup impact preview
 let lastStorage = null;
+let lastInfo = null;
 
 // ---- helpers ----
 function fmtBytes(n) {
@@ -48,6 +57,31 @@ function linkify(s) {
   return escapeHtml(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
 }
 function icon(id, cls = "ico") { return `<svg class="${cls}"><use href="#${id}"/></svg>`; }
+function authQuery() { return authToken ? `token=${encodeURIComponent(authToken)}` : ""; }
+function withAuth(url) {
+  if (!authToken) return url;
+  const u = new URL(url, location.href);
+  u.searchParams.set("token", authToken);
+  return u.pathname + u.search + u.hash;
+}
+async function apiFetch(url, opts = {}) {
+  const headers = new Headers(opts.headers || {});
+  if (authToken) headers.set("X-Ferry-Token", authToken);
+  const res = await fetch(url, { ...opts, headers });
+  if (res.status === 401) {
+    showAuthRequired();
+    throw new Error("pairing required");
+  }
+  return res;
+}
+async function apiJson(url, opts = {}) {
+  return (await apiFetch(url, opts)).json();
+}
+function showAuthRequired() {
+  const rem = $("#reminder");
+  rem.innerHTML = `${icon("i-warn", "ico ico-sm")}<span>Pair this device from Ferry on your laptop. Open Ferry there, press Connect, and scan the QR code.</span>`;
+  rem.classList.remove("hidden");
+}
 
 const THUMBABLE = ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"];
 function ext(name) { return (name.split(".").pop() || "").toLowerCase(); }
@@ -77,10 +111,10 @@ function actionsHtml(m) {
     return `
       <button class="act btn-open" data-id="${m.id}">${icon("i-open", "ico ico-sm")} Open</button>
       <button class="act btn-reveal" data-id="${m.id}" title="Show in folder">${icon("i-folder", "ico ico-sm")} Folder</button>
-      <a class="act icon-only dl" href="/api/download/${m.id}" download title="Download">${icon("i-download", "ico ico-sm")}</a>`;
+      <a class="act icon-only dl" href="${withAuth(`/api/download/${m.id}`)}" download title="Download">${icon("i-download", "ico ico-sm")}</a>`;
   }
   return `
-    <a class="act primary dl" href="/api/download/${m.id}" download>${icon("i-download", "ico ico-sm")} Download</a>
+    <a class="act primary dl" href="${withAuth(`/api/download/${m.id}`)}" download>${icon("i-download", "ico ico-sm")} Download</a>
     <button class="act btn-open" data-id="${m.id}" title="Open on laptop">${icon("i-open", "ico ico-sm")} Open on laptop</button>`;
 }
 function buildNode(m, prev) {
@@ -111,8 +145,8 @@ function goneCard(m) {
 function fileCard(m) {
   if (isThumbable(m.filename)) {
     return `<div class="card has-thumb">
-      <div class="thumb-wrap" data-img="/api/download/${m.id}" data-name="${escapeHtml(m.filename)}">
-        <img loading="lazy" src="/api/download/${m.id}" alt="${escapeHtml(m.filename)}" />
+      <div class="thumb-wrap" data-img="${withAuth(`/api/download/${m.id}`)}" data-name="${escapeHtml(m.filename)}">
+        <img loading="lazy" src="${withAuth(`/api/download/${m.id}`)}" alt="${escapeHtml(m.filename)}" />
         <div class="thumb-badge">${icon("i-image", "ico ico-sm")}<span>${escapeHtml(m.filename)} · ${fmtBytes(m.size)}</span></div>
       </div>
       <div class="card-actions">${actionsHtml(m)}</div>
@@ -164,7 +198,7 @@ function renderEmpty() {
   </div>`;
 }
 async function loadHistory() {
-  const msgs = await (await fetch("/api/messages")).json();
+  const msgs = await apiJson("/api/messages");
   cachedMessages = msgs;
   thread.innerHTML = "";
   if (!msgs.length) { renderEmpty(); return; }
@@ -184,7 +218,7 @@ async function sendText() {
   if (!text) return;
   input.value = "";
   autoGrow();
-  await fetch("/api/messages", {
+  await apiFetch("/api/messages", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, senderId: device.id, senderName: device.name }),
   });
@@ -192,13 +226,14 @@ async function sendText() {
 async function uploadFiles(files) {
   for (const f of files) {
     const q = new URLSearchParams({ name: f.name, senderId: device.id, senderName: device.name });
-    await fetch(`/api/upload?${q}`, { method: "POST", body: f });
+    if (authToken) q.set("token", authToken);
+    await apiFetch(`/api/upload?${q}`, { method: "POST", body: f });
   }
 }
 
 // ---- storage / settings ----
 async function refreshStorage(stats) {
-  const s = stats || (await (await fetch("/api/storage")).json());
+  const s = stats || (await apiJson("/api/storage"));
   lastStorage = s;
   $("#storageUsed").textContent = fmtBytes(s.fileBytes);
   $("#storageLimit").textContent = `of ${fmtBytes(s.limitBytes)}`;
@@ -282,7 +317,7 @@ function wireCleanup() {
       return;
     }
     disarmCleanup();
-    const r = await (await fetch("/api/cleanup", {
+    const r = await (await apiFetch("/api/cleanup", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ days: cleanupDays }),
     })).json();
@@ -297,6 +332,7 @@ function wireCleanup() {
 function openSettings() {
   $("#deviceNameInput").value = device.name;
   refreshStorage();
+  refreshAuthStatus();
   // reset cleanup
   cleanupDays = null;
   $("#cleanupSeg").querySelectorAll("button").forEach((x) => x.classList.remove("on"));
@@ -343,7 +379,8 @@ async function openConnect() {
   $("#connectModal").classList.remove("hidden");
   let primary, alt = [];
   try {
-    const info = await (await fetch("/api/info")).json();
+    const info = await apiJson("/api/info");
+    lastInfo = info;
     primary = info.primary;
     alt = (info.urls || []).filter((u) => u !== primary);
   } catch {}
@@ -353,6 +390,56 @@ async function openConnect() {
   renderQR(primary);
   $("#connectAlt").innerHTML = alt.length
     ? `<b>Also reachable at:</b> ${alt.map((u) => `<code>${u.replace(/^https?:\/\//, "")}</code>`).join(" · ")}` : "";
+}
+
+async function refreshAuthStatus() {
+  const status = $("#authStatus");
+  try {
+    const info = await apiJson("/api/info");
+    lastInfo = info;
+    status.textContent = authToken || isLocalhost ? "Pairing is active." : "This device is not paired.";
+    status.classList.toggle("ok", !!(authToken || isLocalhost));
+  } catch {
+    status.textContent = "Pair this device from the laptop QR code.";
+    status.classList.remove("ok");
+  }
+}
+
+async function copyPairLink(btn) {
+  let link = lastInfo && lastInfo.primary;
+  if (!link) {
+    const info = await apiJson("/api/info");
+    lastInfo = info;
+    link = info.primary;
+  }
+  if (link) copyText(link, btn);
+}
+
+let rotateArmed = false;
+let rotateTimer = null;
+function disarmRotate() {
+  rotateArmed = false;
+  clearTimeout(rotateTimer);
+  $("#rotateToken").textContent = "Rotate token";
+}
+
+async function rotateSharedToken() {
+  const btn = $("#rotateToken");
+  if (!rotateArmed) {
+    rotateArmed = true;
+    btn.textContent = "Click again to rotate";
+    rotateTimer = setTimeout(disarmRotate, 3500);
+    return;
+  }
+  disarmRotate();
+  const data = await apiJson("/api/auth/rotate", { method: "POST" });
+  const newUrl = new URL(data.info.primary);
+  authToken = newUrl.searchParams.get("token") || authToken;
+  if (authToken) localStorage.setItem(AUTH_KEY, authToken);
+  lastInfo = data.info;
+  $("#authImpact").textContent = "Token rotated. Scan the new QR on other devices.";
+  refreshAuthStatus();
+  connectWS();
 }
 
 // ---- theme (light / dark / system) ----
@@ -383,15 +470,17 @@ function setConn(on) {
 }
 function connectWS() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const qs = authQuery();
+  const ws = new WebSocket(`${proto}://${location.host}/ws${qs ? `?${qs}` : ""}`);
   ws.onopen = () => setConn(true);
   ws.onmessage = (ev) => {
     const data = JSON.parse(ev.data);
     if (data.type === "message") addMessage(data.message);
     else if (data.type === "storage") refreshStorage(data.storage);
     else if (data.type === "cleanup") loadHistory();
+    else if (data.type === "auth") showAuthRequired();
   };
-  ws.onclose = () => { setConn(false); setTimeout(connectWS, 1500); };
+  ws.onclose = () => { setConn(false); setTimeout(connectWS, authToken ? 1500 : 5000); };
 }
 
 // ---- input UX ----
@@ -418,8 +507,8 @@ thread.addEventListener("click", (e) => {
   const open = e.target.closest(".btn-open");
   const reveal = e.target.closest(".btn-reveal");
   const thumb = e.target.closest(".thumb-wrap");
-  if (open) { e.preventDefault(); fetch(`/api/open/${open.dataset.id}`, { method: "POST" }).catch(() => {}); }
-  else if (reveal) { e.preventDefault(); fetch(`/api/reveal/${reveal.dataset.id}`, { method: "POST" }).catch(() => {}); }
+  if (open) { e.preventDefault(); apiFetch(`/api/open/${open.dataset.id}`, { method: "POST" }).catch(() => {}); }
+  else if (reveal) { e.preventDefault(); apiFetch(`/api/reveal/${reveal.dataset.id}`, { method: "POST" }).catch(() => {}); }
   else if (thumb) { openLightbox(thumb.dataset.img, thumb.dataset.name); }
 });
 function openLightbox(src, alt) {
@@ -443,6 +532,8 @@ $("#connectBtn").addEventListener("click", openConnect);
 $("#closeConnect").addEventListener("click", () => $("#connectModal").classList.add("hidden"));
 $("#connectModal").addEventListener("click", (e) => { if (e.target.id === "connectModal") e.currentTarget.classList.add("hidden"); });
 $("#copyUrl").addEventListener("click", (e) => copyText(connectFullUrl, e.currentTarget));
+$("#copyPairLink").addEventListener("click", (e) => copyPairLink(e.currentTarget).catch(() => showAuthRequired()));
+$("#rotateToken").addEventListener("click", () => rotateSharedToken().catch(() => showAuthRequired()));
 
 // settings controls
 $("#settingsBtn").addEventListener("click", openSettings);
@@ -456,6 +547,6 @@ wireCleanup();
 // ---- boot ----
 applyTheme();
 setConn(false);
-loadHistory();
-refreshStorage();
+loadHistory().catch(() => {});
+refreshStorage().catch(() => {});
 connectWS();

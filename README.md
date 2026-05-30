@@ -42,7 +42,7 @@ npm install
 npm start
 ```
 
-Ferry prints a laptop URL and one or more phone URLs. Open the laptop URL locally, then press **Connect** and scan the QR code from your phone.
+Ferry prints a laptop URL and a pairing URL for your phone. Open the laptop URL locally, then press **Connect** and scan the QR code from your phone.
 
 By default Ferry listens on port `8787`.
 
@@ -80,7 +80,7 @@ npm run uninstall:windows
 | Messages | Send short notes between devices in one shared thread. |
 | Files | Upload, download, open, and reveal transferred files. |
 | Images | Show thumbnails and a lightbox for image uploads. |
-| Connect | Show a QR code for the current LAN address. |
+| Connect | Show a QR code with the current LAN address and pairing token. |
 | Appearance | Light, dark, and system theme modes. |
 | Storage | Show usage and clean up older uploaded files. |
 
@@ -99,9 +99,9 @@ data/                  Local runtime data, ignored by git
 
 Ferry is for a trusted home network.
 
-There is no authentication yet. Anyone who can reach the Ferry URL on your network can read the thread, post messages, upload and download files, and use host-side open/reveal actions. Do not expose Ferry to public Wi-Fi, the open internet, or a forwarded port.
+Ferry uses a shared pairing token. Scan the QR code from the laptop once, and the phone stores the token for later visits.
 
-Shared-token access is the next major security step.
+Do not expose Ferry to public Wi-Fi, the open internet, or a forwarded port. The token is meant to keep casual LAN access out, not to make Ferry safe as an internet-facing service.
 
 ## Tech
 

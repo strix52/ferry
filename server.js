@@ -16,6 +16,7 @@ const STORAGE_LIMIT_BYTES = (Number(process.env.STORAGE_LIMIT_MB) || 2048) * 102
 const DATA_DIR = path.join(__dirname, "data");
 const FILES_DIR = path.join(DATA_DIR, "files");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const AUTH_FILE = path.join(DATA_DIR, "auth.json");
 fs.mkdirSync(FILES_DIR, { recursive: true });
 
 const db = new DatabaseSync(path.join(DATA_DIR, "flow.db"));
@@ -40,6 +41,61 @@ const insertMsg = db.prepare(`
 `);
 const getMsg = db.prepare(`SELECT * FROM messages WHERE id = ?`);
 const listMsgs = db.prepare(`SELECT * FROM messages ORDER BY id ASC`);
+
+// ---- shared-token auth ----
+function readAuthConfig() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(AUTH_FILE, "utf8"));
+    if (typeof parsed.token === "string" && parsed.token.length >= 24) return parsed;
+  } catch {}
+  const fresh = {
+    token: crypto.randomBytes(24).toString("base64url"),
+    createdAt: Date.now(),
+    rotatedAt: null,
+  };
+  fs.writeFileSync(AUTH_FILE, JSON.stringify(fresh, null, 2));
+  return fresh;
+}
+
+let authConfig = readAuthConfig();
+
+function isLoopback(req) {
+  const addr = req.socket.remoteAddress || "";
+  return addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1";
+}
+
+function safeEqual(a, b) {
+  const aa = Buffer.from(String(a || ""));
+  const bb = Buffer.from(String(b || ""));
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+}
+
+function tokenFrom(req, url) {
+  const header = req.headers["x-ferry-token"];
+  if (Array.isArray(header)) return header[0];
+  return header || url.searchParams.get("token") || "";
+}
+
+function isAuthorized(req, url) {
+  return isLoopback(req) || safeEqual(tokenFrom(req, url), authConfig.token);
+}
+
+function requireAuth(req, res, url) {
+  if (isAuthorized(req, url)) return true;
+  send(res, 401, { error: "pairing required" });
+  return false;
+}
+
+function rotateToken() {
+  authConfig = {
+    token: crypto.randomBytes(24).toString("base64url"),
+    createdAt: authConfig.createdAt || Date.now(),
+    rotatedAt: Date.now(),
+  };
+  fs.writeFileSync(AUTH_FILE, JSON.stringify(authConfig, null, 2));
+  broadcast({ type: "auth", action: "rotated" });
+  return authConfig;
+}
 
 // ---- websocket broadcast ----
 const wss = new WebSocketServer({ noServer: true });
@@ -85,6 +141,27 @@ function send(res, status, body, headers = {}) {
   res.end(data);
 }
 
+function publicInfo(includeToken = false) {
+  const ips = lanIPs().filter((ip) => !ip.startsWith("169.254."));
+  const rank = (ip) =>
+    ip.startsWith("192.168.") ? 0 : ip.startsWith("10.") ? 1 : ip.startsWith("172.") ? 2 : 3;
+  ips.sort((a, b) => rank(a) - rank(b));
+  const urls = ips.map((ip) => `http://${ip}:${PORT}`);
+  const withToken = (u) => includeToken ? `${u}?token=${encodeURIComponent(authConfig.token)}` : u;
+  return {
+    port: PORT,
+    ips,
+    urls: urls.map(withToken),
+    primary: urls[0] ? withToken(urls[0]) : null,
+    auth: {
+      required: true,
+      paired: includeToken,
+      createdAt: authConfig.createdAt,
+      rotatedAt: authConfig.rotatedAt,
+    },
+  };
+}
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -128,23 +205,27 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.method === "GET" && p === "/api/messages") {
+      if (!requireAuth(req, res, url)) return;
       return send(res, 200, listMsgs.all().map(msgToClient));
     }
 
     if (req.method === "GET" && p === "/api/storage") {
+      if (!requireAuth(req, res, url)) return;
       return send(res, 200, storageStats());
     }
 
     if (req.method === "GET" && p === "/api/info") {
-      const ips = lanIPs().filter((ip) => !ip.startsWith("169.254."));
-      const rank = (ip) =>
-        ip.startsWith("192.168.") ? 0 : ip.startsWith("10.") ? 1 : ip.startsWith("172.") ? 2 : 3;
-      ips.sort((a, b) => rank(a) - rank(b));
-      const urls = ips.map((ip) => `http://${ip}:${PORT}`);
-      return send(res, 200, { port: PORT, ips, urls, primary: urls[0] || null });
+      return send(res, 200, publicInfo(isAuthorized(req, url)));
+    }
+
+    if (req.method === "POST" && p === "/api/auth/rotate") {
+      if (!requireAuth(req, res, url)) return;
+      rotateToken();
+      return send(res, 200, { ok: true, auth: publicInfo(true).auth, info: publicInfo(true) });
     }
 
     if (req.method === "POST" && p === "/api/messages") {
+      if (!requireAuth(req, res, url)) return;
       const body = await readJsonBody(req);
       const text = (body.text || "").toString().trim();
       if (!text) return send(res, 400, { error: "empty" });
@@ -158,6 +239,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && p === "/api/upload") {
+      if (!requireAuth(req, res, url)) return;
       const filename = (url.searchParams.get("name") || "file").toString();
       const senderId = (url.searchParams.get("senderId") || "unknown").slice(0, 64);
       const senderName = (url.searchParams.get("senderName") || "Device").slice(0, 40);
@@ -182,6 +264,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && p.startsWith("/api/download/")) {
+      if (!requireAuth(req, res, url)) return;
       const id = Number(p.split("/").pop());
       const row = getMsg.get(id);
       if (!row || row.kind !== "file" || row.deleted) return send(res, 404, { error: "gone" });
@@ -196,6 +279,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && p.startsWith("/api/open/")) {
+      if (!requireAuth(req, res, url)) return;
       const id = Number(p.split("/").pop());
       const row = getMsg.get(id);
       if (!row || row.kind !== "file" || row.deleted) return send(res, 404, { error: "gone" });
@@ -209,6 +293,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && p.startsWith("/api/reveal/")) {
+      if (!requireAuth(req, res, url)) return;
       const id = Number(p.split("/").pop());
       const row = getMsg.get(id);
       if (!row || row.kind !== "file" || row.deleted) return send(res, 404, { error: "gone" });
@@ -222,6 +307,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && p === "/api/cleanup") {
+      if (!requireAuth(req, res, url)) return;
       const body = await readJsonBody(req);
       const days = Number(body.days);
       if (!Number.isFinite(days) || days < 0 || days > 3650) return send(res, 400, { error: "days must be between 0 and 3650" });
@@ -245,7 +331,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.on("upgrade", (req, socket, head) => {
-  if (new URL(req.url, `http://${req.headers.host}`).pathname !== "/ws") {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname !== "/ws" || !isAuthorized(req, url)) {
     socket.destroy();
     return;
   }
@@ -265,7 +352,7 @@ function lanIPs() {
 server.listen(PORT, "0.0.0.0", () => {
   console.log("\n  Ferry is running.\n");
   console.log(`  On this laptop:  http://localhost:${PORT}`);
-  for (const ip of lanIPs()) console.log(`  On your phone:   http://${ip}:${PORT}`);
-  console.log("\n  Open one of the phone URLs in your phone browser (same Wi-Fi) and bookmark it.");
+  for (const ip of lanIPs()) console.log(`  Pair your phone: http://${ip}:${PORT}?token=${authConfig.token}`);
+  console.log("\n  Open Ferry on this laptop and use Connect to scan the pairing QR.");
   console.log("  Press Ctrl+C to stop.\n");
 });

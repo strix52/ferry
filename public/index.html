@@ -126,6 +126,25 @@
         </div>
       </section>
 
+      <!-- Security -->
+      <section class="set-section">
+        <div class="set-label">Security</div>
+        <div class="set-row stack">
+          <div class="set-row-text">
+            <div class="set-row-title">Shared token</div>
+            <div class="set-row-desc">Only devices opened from your Ferry QR code can use this thread.</div>
+          </div>
+          <div class="security-box">
+            <div class="security-status" id="authStatus">Checking pairing...</div>
+            <div class="security-actions">
+              <button class="set-button" id="copyPairLink">Copy pairing link</button>
+              <button class="set-button danger" id="rotateToken">Rotate token</button>
+            </div>
+            <div class="impact" id="authImpact">Rotating the token signs out other devices until they scan the QR again.</div>
+          </div>
+        </div>
+      </section>
+
       <!-- Storage -->
       <section class="set-section">
         <div class="set-label">Storage</div>
