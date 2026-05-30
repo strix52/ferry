@@ -5,7 +5,10 @@
   "type": "module",
   "description": "LAN-only chat + file transfer thread between phone and laptop",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "tray": "powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File ./scripts/Ferry.Tray.ps1",
+    "install:windows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/Install-FerryWindows.ps1",
+    "uninstall:windows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/Uninstall-FerryWindows.ps1"
   },
   "dependencies": {
     "ws": "^8.18.0"

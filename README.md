@@ -51,6 +51,28 @@ $env:PORT=8790
 npm start
 ```
 
+## Windows Helper
+
+Ferry includes a lightweight Windows helper for daily use:
+
+```powershell
+npm run install:windows
+```
+
+That creates a Start menu shortcut named **Ferry** and a per-user autostart entry. The helper keeps a notification-area icon alive, starts the server, opens Ferry in your default browser, copies the phone URL, and can restart or stop the server.
+
+You can also run it manually:
+
+```powershell
+npm run tray
+```
+
+To remove the Start menu shortcut and autostart entry:
+
+```powershell
+npm run uninstall:windows
+```
+
 ## Features
 
 | Area | What Ferry does |
