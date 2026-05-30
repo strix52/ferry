@@ -1,0 +1,13 @@
+{
+  "name": "ferry",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "LAN-only chat + file transfer thread between phone and laptop",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
