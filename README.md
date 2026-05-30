@@ -1,19 +1,39 @@
-# Ferry
+<p align="center">
+  <img src="public/favicon.svg" width="72" height="72" alt="Ferry logo">
+</p>
 
-Ferry is a self-hosted, LAN-only chat thread for sending notes and files between your phone and laptop.
+<h1 align="center">Ferry</h1>
 
-It runs on your laptop, opens in the phone browser, and keeps a persistent local history. There is no cloud service, no account, and no external sync provider.
+<p align="center">
+  A tiny local bridge for notes and files between your laptop and phone.
+</p>
 
-## Features
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-7d5c84"></a>
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-24+-2f6f4e">
+  <img alt="LAN only" src="https://img.shields.io/badge/scope-LAN%20only-5b6470">
+</p>
 
-- Send text and files between devices on the same local network.
-- Keep persistent history in SQLite, with uploaded files stored on the laptop.
-- Preview image uploads as thumbnails and open them in a lightbox.
-- Scan a QR code from the phone instead of typing the laptop IP address.
-- Switch between light, dark, and system themes.
-- Set the device name shown beside messages.
-- Preview and clean up old uploaded files from Settings.
-- Open or reveal laptop-side files directly from supported desktop browsers on Windows.
+Ferry gives your own devices one shared thread on your local network. Drop in a note, photo, PDF, APK, or anything else, and it shows up on the other screen without signing in, uploading to a cloud drive, or hunting for a cable.
+
+It is deliberately small: one Node server, one browser UI, one SQLite database, and files stored on your laptop.
+
+## Why Ferry?
+
+- **Fast local handoff:** send text and files between phone and laptop on the same Wi-Fi.
+- **No account:** the laptop is the server; the phone is just a browser client.
+- **Persistent thread:** messages stay in a local SQLite database.
+- **Built for daily use:** QR connect, image previews, lightbox, light/dark/system themes, and storage cleanup.
+- **Desktop-aware:** files already on the laptop can be opened or revealed in Explorer.
+
+## How It Fits Together
+
+```mermaid
+flowchart LR
+  Phone["Phone browser"] <-->|"HTTP + WebSocket"| Laptop["Laptop running Ferry"]
+  Laptop --> DB[("SQLite message history")]
+  Laptop --> Files["data/files uploads"]
+```
 
 ## Quick Start
 
@@ -22,54 +42,51 @@ npm install
 npm start
 ```
 
-Open the printed LAN URL on your phone, or open `http://localhost:8787` on the laptop. Use the Connect button to show a QR code for the current LAN address.
+Ferry prints a laptop URL and one or more phone URLs. Open the laptop URL locally, then press **Connect** and scan the QR code from your phone.
 
-## How It Works
-
-The laptop is the server and each device is a browser client. Ferry uses HTTP for the app and file transfers, WebSocket for live updates, SQLite for message metadata, and `data/files/` for uploaded file blobs.
-
-The runtime is intentionally small: Node.js, `ws`, built-in `node:sqlite`, vanilla HTML/CSS/JavaScript, and a vendored offline QR generator.
-
-## Security Scope
-
-Ferry is designed for a trusted home LAN.
-
-There is currently no authentication. Anyone on the same network who can reach the Ferry URL can read messages, post messages, upload/download files, and trigger host-side open/reveal actions. Do not expose Ferry to untrusted networks, public Wi-Fi, or the internet, and do not port-forward it.
-
-Shared-token authentication is the top roadmap item before wider use.
-
-## Storage
-
-Message metadata is stored in `data/flow.db`. Uploaded files are stored in `data/files/`. The `data/` directory is ignored by git.
-
-Settings includes a cleanup preview for deleting uploaded files older than a selected age. Message history stays visible, but deleted file blobs become unavailable.
-
-## Development
-
-```powershell
-npm start
-```
-
-The default port is `8787`. Override it with `PORT` if needed:
+By default Ferry listens on port `8787`.
 
 ```powershell
 $env:PORT=8790
 npm start
 ```
 
-## Publishing Note
+## Features
 
-If this project has ever contained personal helper scripts, private notes, real device IDs, or local paths in git history, publish Ferry from a fresh orphan branch or a new repository containing only the app files:
+| Area | What Ferry does |
+| --- | --- |
+| Messages | Send short notes between devices in one shared thread. |
+| Files | Upload, download, open, and reveal transferred files. |
+| Images | Show thumbnails and a lightbox for image uploads. |
+| Connect | Show a QR code for the current LAN address. |
+| Appearance | Light, dark, and system theme modes. |
+| Storage | Show usage and clean up older uploaded files. |
 
-- `server.js`
-- `package.json`
-- `package-lock.json`
-- `public/`
-- `.gitignore`
-- `README.md`
-- `LICENSE`
+## Project Layout
 
-Do not publish private helper scripts, internal notes, local data, or old branch history.
+```text
+server.js              HTTP, WebSocket, upload, download, cleanup
+public/index.html      App shell
+public/app.js          Client state and UI behavior
+public/style.css       Theme and layout
+public/vendor/         Offline QR generator
+data/                  Local runtime data, ignored by git
+```
+
+## Security Scope
+
+Ferry is for a trusted home network.
+
+There is no authentication yet. Anyone who can reach the Ferry URL on your network can read the thread, post messages, upload and download files, and use host-side open/reveal actions. Do not expose Ferry to public Wi-Fi, the open internet, or a forwarded port.
+
+Shared-token access is the next major security step.
+
+## Tech
+
+- Node.js with native `node:sqlite`
+- `ws` for live updates
+- Vanilla HTML, CSS, and JavaScript
+- Vendored `qrcode-generator` for offline QR codes
 
 ## Credits
 
@@ -77,4 +94,4 @@ Ferry vendors `public/vendor/qrcode.js`, based on `qrcode-generator` by Kazuhiko
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
