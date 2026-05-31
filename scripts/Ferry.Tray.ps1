@@ -165,6 +165,15 @@ $notify.Icon = New-Object System.Drawing.Icon($IconFile)
 $notify.Text = "Ferry"
 $notify.Visible = $true
 
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "Ferry"
+$form.ShowInTaskbar = $false
+$form.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedToolWindow
+$form.Opacity = 0
+$form.Size = New-Object System.Drawing.Size(0, 0)
+$form.Add_Shown({ $form.Hide() })
+
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $openItem = $menu.Items.Add("Open Ferry")
 $copyUrlItem = $menu.Items.Add("Copy Phone URL")
@@ -197,7 +206,7 @@ $logsItem.Add_Click({ Start-Process $DataDir })
 $quitItem.Add_Click({
   Stop-FerryServer
   $notify.Visible = $false
-  [System.Windows.Forms.Application]::Exit()
+  $form.Close()
 })
 
 $notify.ContextMenuStrip = $menu
@@ -215,10 +224,11 @@ if ($started) {
 }
 
 try {
-  [System.Windows.Forms.Application]::Run()
+  [System.Windows.Forms.Application]::Run($form)
 } finally {
   $notify.Visible = $false
   $notify.Dispose()
+  $form.Dispose()
   $mutex.ReleaseMutex() | Out-Null
   $mutex.Dispose()
 }
