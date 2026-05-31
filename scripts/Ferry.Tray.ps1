@@ -15,7 +15,8 @@ $PidFile = Join-Path $DataDir "ferry.pid"
 $IconFile = Join-Path $DataDir "ferry.ico"
 $OutLog = Join-Path $DataDir "ferry.out.log"
 $ErrLog = Join-Path $DataDir "ferry.err.log"
-$Url = "http://localhost:$Port"
+$OpenUrl = "http://localhost:$Port"
+$HealthUrl = "http://127.0.0.1:$Port"
 
 function Ensure-DataDir {
   if (!(Test-Path -LiteralPath $DataDir)) {
@@ -64,7 +65,7 @@ function New-FerryIconFile {
 
 function Test-FerryServer {
   try {
-    $res = Invoke-RestMethod -Uri "$Url/api/info" -TimeoutSec 2
+    $res = Invoke-RestMethod -Uri "$HealthUrl/api/info" -TimeoutSec 2
     return ($res.port -eq $Port)
   } catch {
     return $false
@@ -97,7 +98,7 @@ function Start-FerryServer {
 
   $node = (Get-Command node -ErrorAction Stop).Source
   $proc = Start-Process -FilePath $node `
-    -ArgumentList "server.js" `
+    -ArgumentList "--no-warnings", "server.js" `
     -WorkingDirectory $ProjectRoot `
     -WindowStyle Hidden `
     -RedirectStandardOutput $OutLog `
@@ -134,15 +135,15 @@ function Stop-FerryServer {
 }
 
 function Open-Ferry {
-  Start-Process $Url
+  Start-Process $OpenUrl
 }
 
 function Get-FerryPhoneUrl {
   try {
-    $info = Invoke-RestMethod -Uri "$Url/api/info" -TimeoutSec 2
+    $info = Invoke-RestMethod -Uri "$HealthUrl/api/info" -TimeoutSec 2
     if ($info.primary) { return [string]$info.primary }
   } catch {}
-  return $Url
+  return $OpenUrl
 }
 
 New-FerryIconFile
@@ -218,7 +219,7 @@ $notify.Add_MouseUp({
 })
 
 if ($started) {
-  $notify.ShowBalloonTip(2500, "Ferry", "Ferry is running at $Url.", [System.Windows.Forms.ToolTipIcon]::Info)
+  $notify.ShowBalloonTip(2500, "Ferry", "Ferry is running at $OpenUrl.", [System.Windows.Forms.ToolTipIcon]::Info)
 } else {
   $notify.ShowBalloonTip(5000, "Ferry", "Ferry did not start. Check data\ferry.err.log.", [System.Windows.Forms.ToolTipIcon]::Error)
 }
