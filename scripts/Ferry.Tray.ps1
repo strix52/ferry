@@ -15,6 +15,7 @@ $PidFile = Join-Path $DataDir "ferry.pid"
 $IconFile = Join-Path $DataDir "ferry.ico"
 $OutLog = Join-Path $DataDir "ferry.out.log"
 $ErrLog = Join-Path $DataDir "ferry.err.log"
+$TrayLog = Join-Path $DataDir "ferry.tray.log"
 $OpenUrl = "http://localhost:$Port"
 $HealthUrl = "http://127.0.0.1:$Port"
 
@@ -22,6 +23,18 @@ function Ensure-DataDir {
   if (!(Test-Path -LiteralPath $DataDir)) {
     New-Item -ItemType Directory -Path $DataDir | Out-Null
   }
+}
+
+function Write-TrayLog {
+  param([string]$Message)
+  Ensure-DataDir
+  $line = "{0} {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Message
+  Add-Content -LiteralPath $TrayLog -Value $line -Encoding UTF8
+}
+
+trap {
+  Write-TrayLog ("ERROR: " + $_.Exception.Message)
+  throw $_
 }
 
 function New-FerryIconFile {
@@ -83,6 +96,7 @@ function Get-FerryPortProcessId {
 function Start-FerryServer {
   Ensure-DataDir
   if (Test-FerryServer) {
+    Write-TrayLog "Ferry server already healthy."
     $existingPid = Get-FerryPortProcessId
     if ($existingPid) {
       Set-Content -LiteralPath $PidFile -Value $existingPid -Encoding ASCII
@@ -92,11 +106,13 @@ function Start-FerryServer {
 
   $portPid = Get-FerryPortProcessId
   if ($portPid) {
+    Write-TrayLog "Port $Port is already owned by PID $portPid."
     Set-Content -LiteralPath $PidFile -Value $portPid -Encoding ASCII
     return (Test-FerryServer)
   }
 
   $node = (Get-Command node -ErrorAction Stop).Source
+  Write-TrayLog "Starting Ferry server with $node."
   $proc = Start-Process -FilePath $node `
     -ArgumentList "--no-warnings", "server.js" `
     -WorkingDirectory $ProjectRoot `
@@ -109,9 +125,13 @@ function Start-FerryServer {
 
   for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Milliseconds 400
-    if (Test-FerryServer) { return $true }
+    if (Test-FerryServer) {
+      Write-TrayLog "Ferry server became healthy as PID $($proc.Id)."
+      return $true
+    }
   }
 
+  Write-TrayLog "Ferry server did not become healthy after startup wait."
   return $false
 }
 
@@ -146,13 +166,18 @@ function Get-FerryPhoneUrl {
   return $OpenUrl
 }
 
+Ensure-DataDir
+Write-TrayLog "Tray helper invoked. ProjectRoot=$ProjectRoot Port=$Port GenerateIconOnly=$GenerateIconOnly NoOpen=$NoOpen"
 New-FerryIconFile
 if ($GenerateIconOnly) { exit 0 }
+
+Start-Sleep -Seconds 6
 
 $createdNew = $false
 $mutex = New-Object System.Threading.Mutex($true, "Local\FerryTray", [ref]$createdNew)
 
 if (!$createdNew) {
+  Write-TrayLog "Another tray helper owns the mutex. Delegating to existing instance."
   Start-FerryServer | Out-Null
   if (!$NoOpen) { Open-Ferry }
   exit 0
@@ -160,11 +185,13 @@ if (!$createdNew) {
 
 $started = Start-FerryServer
 if (!$NoOpen -and $started) { Open-Ferry }
+Write-TrayLog "Creating NotifyIcon."
 
 $notify = New-Object System.Windows.Forms.NotifyIcon
 $notify.Icon = New-Object System.Drawing.Icon($IconFile)
 $notify.Text = "Ferry"
 $notify.Visible = $true
+Write-TrayLog "NotifyIcon set visible."
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Ferry"
@@ -219,14 +246,18 @@ $notify.Add_MouseUp({
 })
 
 if ($started) {
+  Write-TrayLog "Startup health check succeeded."
   $notify.ShowBalloonTip(2500, "Ferry", "Ferry is running at $OpenUrl.", [System.Windows.Forms.ToolTipIcon]::Info)
 } else {
+  Write-TrayLog "Startup health check failed."
   $notify.ShowBalloonTip(5000, "Ferry", "Ferry did not start. Check data\ferry.err.log.", [System.Windows.Forms.ToolTipIcon]::Error)
 }
 
 try {
+  Write-TrayLog "Entering WinForms message loop."
   [System.Windows.Forms.Application]::Run($form)
 } finally {
+  Write-TrayLog "Tray helper exiting."
   $notify.Visible = $false
   $notify.Dispose()
   $form.Dispose()
