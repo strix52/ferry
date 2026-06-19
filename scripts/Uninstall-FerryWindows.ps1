@@ -15,6 +15,14 @@ Remove-Item -LiteralPath $StartMenuShortcut -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $StartupShortcut -Force -ErrorAction SilentlyContinue
 Remove-ItemProperty -Path $RunKey -Name "Ferry" -Force -ErrorAction SilentlyContinue
 
+Get-CimInstance Win32_Process -Filter "name = 'FerryTray.exe'" |
+  Where-Object { $_.CommandLine -like "*$ProjectRoot*" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+Get-CimInstance Win32_Process -Filter "name = 'powershell.exe'" |
+  Where-Object { $_.CommandLine -like "*Ferry.Tray.ps1*" -and $_.CommandLine -like "*$ProjectRoot*" } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
 if (Test-Path -LiteralPath $PidFile) {
   $pidText = (Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
   $serverPid = 0

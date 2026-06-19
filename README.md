@@ -61,6 +61,8 @@ npm run install:windows
 
 That creates a Start menu shortcut named **Ferry** and a per-user autostart entry. The helper keeps a notification-area icon alive, starts the server, opens Ferry in your default browser, copies the phone URL, and can restart or stop the server.
 
+The Windows tray helper is a tiny native WinForms executable built locally from source during install.
+
 You can also run it manually:
 
 ```powershell
