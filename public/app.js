@@ -139,6 +139,7 @@ function pinActionHtml(m) {
   const label = m.pinnedAt ? "Unpin" : "Pin";
   return `<button class="act btn-pin" data-id="${m.id}" data-pinned="${m.pinnedAt ? "true" : "false"}">${label}</button>`;
 }
+function copyActionHtml(m) { return `<button class="act btn-copy" data-id="${m.id}">${icon("i-copy", "ico ico-sm")} <span>Copy</span></button>`; }
 function pinPreview(m) { return m.kind === "file" ? (m.deleted ? `${m.filename} · removed` : m.filename) : (m.text || "(empty message)"); }
 function renderPins() {
   const strip = $("#pinnedStrip");
@@ -207,7 +208,7 @@ function buildNode(m, prev) {
   const avatar = grouped ? `<div class="avatar spacer"></div>` : avatarFor(m.senderName, mine);
   const meta = grouped ? "" :
     `<div class="meta"><span class="who">${escapeHtml(m.senderName)}</span><span>${fmtTime(m.createdAt)}</span></div>`;
-  const body = m.kind === "file" ? (m.deleted ? goneCard(m) : fileCard(m)) : `<div class="text-card"><div class="bubble">${linkify(m.text || "")}</div><div class="message-actions">${pinActionHtml(m)}</div></div>`;
+  const body = m.kind === "file" ? (m.deleted ? goneCard(m) : fileCard(m)) : `<div class="text-card"><div class="bubble">${linkify(m.text || "")}</div><div class="message-actions">${copyActionHtml(m)}${pinActionHtml(m)}</div></div>`;
 
   row.innerHTML = `${avatar}<div class="bubble-col">${meta}${body}</div>`;
   return row;
@@ -464,6 +465,23 @@ function fallbackCopy(text, done) {
   try { document.execCommand("copy"); done(); } catch {}
   ta.remove();
 }
+function copyMessage(text, button) {
+  const label = button.querySelector("span");
+  const show = (value) => {
+    label.textContent = value;
+    setTimeout(() => { label.textContent = "Copy"; }, 1400);
+  };
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const copied = document.execCommand("copy");
+    ta.remove();
+    show(copied ? "Copied" : "Copy failed");
+  };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(() => show("Copied")).catch(fallback);
+  else fallback();
+}
 async function openConnect() {
   $("#connectModal").classList.remove("hidden");
   let primary, alt = [];
@@ -606,8 +624,10 @@ thread.addEventListener("click", (e) => {
   const reveal = e.target.closest(".btn-reveal");
   const thumb = e.target.closest(".thumb-wrap");
   const pin = e.target.closest(".btn-pin");
+  const copy = e.target.closest(".btn-copy");
   if (open) { e.preventDefault(); apiFetch(`/api/open/${open.dataset.id}`, { method: "POST" }).catch(() => {}); }
   else if (reveal) { e.preventDefault(); apiFetch(`/api/reveal/${reveal.dataset.id}`, { method: "POST" }).catch(() => {}); }
+  else if (copy) { e.preventDefault(); const message = cachedMessages.find((m) => m.id === Number(copy.dataset.id)); if (message) copyMessage(message.text || "", copy); }
   else if (pin) { e.preventDefault(); setPinned(pin.dataset.id, pin.dataset.pinned !== "true").catch(() => {}); }
   else if (thumb) { openLightbox(thumb.dataset.img, thumb.dataset.name); }
 });
