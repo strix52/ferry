@@ -36,6 +36,10 @@ let lastStorage = null;
 let lastInfo = null;
 let pinnedItems = [];
 let pinsExpanded = false;
+const DRAFT_KEY = "ferry_draft_v1";
+const READ_KEY = "ferry_last_read_message_id_v1";
+let lastReadId = Number(localStorage.getItem(READ_KEY) || 0);
+let draftTimer = null;
 
 // ---- helpers ----
 function fmtBytes(n) {
@@ -106,6 +110,31 @@ function avatarFor(name, mine) {
 }
 function atBottom() { return scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight < 90; }
 function scrollDown() { scrollArea.scrollTop = scrollArea.scrollHeight; }
+function latestMessageId() { return cachedMessages.length ? cachedMessages[cachedMessages.length - 1].id : 0; }
+function unreadMessages() { return cachedMessages.filter((m) => m.id > lastReadId); }
+function renderUnread() {
+  const count = unreadMessages().length;
+  const badge = $("#unreadCount");
+  badge.classList.toggle("hidden", count === 0);
+  badge.textContent = count ? `${count} new` : "";
+}
+function saveDraftSoon() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    if (input.value) localStorage.setItem(DRAFT_KEY, input.value);
+    else localStorage.removeItem(DRAFT_KEY);
+  }, 300);
+}
+function clearDraft() { clearTimeout(draftTimer); localStorage.removeItem(DRAFT_KEY); }
+function markReadAtBottom() {
+  if (!atBottom()) return;
+  const latest = latestMessageId();
+  if (latest <= lastReadId) return;
+  lastReadId = latest;
+  localStorage.setItem(READ_KEY, String(lastReadId));
+  thread.querySelector(".new-sep")?.remove();
+  renderUnread();
+}
 function pinActionHtml(m) {
   const label = m.pinnedAt ? "Unpin" : "Pin";
   return `<button class="act btn-pin" data-id="${m.id}" data-pinned="${m.pinnedAt ? "true" : "false"}">${label}</button>`;
@@ -216,6 +245,12 @@ function daySep(ts) {
   el.textContent = dayLabel(ts);
   return el;
 }
+function newSep() {
+  const el = document.createElement("div");
+  el.className = "new-sep";
+  el.textContent = "New since last visit";
+  return el;
+}
 function lastMsgInfo() {
   const rows = thread.querySelectorAll(".msg");
   const last = rows[rows.length - 1];
@@ -236,6 +271,7 @@ function addMessage(m) {
   }
   const i = cachedMessages.findIndex((x) => x.id === m.id);
   if (i >= 0) cachedMessages[i] = m; else cachedMessages.push(m);
+  if (atBottom()) markReadAtBottom(); else renderUnread();
 }
 function renderEmpty() {
   thread.innerHTML = `<div class="empty">
@@ -247,16 +283,20 @@ function renderEmpty() {
 async function loadHistory() {
   const msgs = await apiJson("/api/messages");
   cachedMessages = msgs;
+  const latest = latestMessageId();
+  if (!lastReadId && latest) { lastReadId = latest; localStorage.setItem(READ_KEY, String(latest)); }
   thread.innerHTML = "";
   if (!msgs.length) { renderEmpty(); return; }
-  let prev = null, curDay = null;
+  let prev = null, curDay = null, insertedNew = false;
   for (const m of msgs) {
     const dk = dateKey(m.createdAt);
     if (dk !== curDay) { thread.appendChild(daySep(m.createdAt)); curDay = dk; prev = null; }
+    if (!insertedNew && m.id > lastReadId) { thread.appendChild(newSep()); insertedNew = true; }
     thread.appendChild(buildNode(m, prev));
     prev = m;
   }
-  scrollDown();
+  renderUnread();
+  if (!insertedNew) scrollDown();
 }
 async function loadPins() { pinnedItems = await apiJson("/api/pins"); renderPins(); }
 
@@ -264,12 +304,13 @@ async function loadPins() { pinnedItems = await apiJson("/api/pins"); renderPins
 async function sendText() {
   const text = input.value.trim();
   if (!text) return;
-  input.value = "";
-  autoGrow();
   await apiFetch("/api/messages", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, senderId: device.id, senderName: device.name }),
   });
+  input.value = "";
+  clearDraft();
+  autoGrow();
 }
 async function uploadFiles(files) {
   for (const f of files) {
@@ -537,7 +578,7 @@ function autoGrow() {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 120) + "px";
 }
-input.addEventListener("input", autoGrow);
+input.addEventListener("input", () => { autoGrow(); saveDraftSoon(); });
 input.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
   // Phone keyboards can emit Enter when confirming a paste. Keep the pasted text editable;
@@ -549,6 +590,7 @@ input.addEventListener("keydown", (e) => {
 sendBtn.addEventListener("click", sendText);
 $("#attachBtn").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => { if (fileInput.files.length) uploadFiles([...fileInput.files]); fileInput.value = ""; });
+scrollArea.addEventListener("scroll", markReadAtBottom);
 
 // device rename (from settings)
 function commitDeviceName() {
@@ -621,6 +663,8 @@ wireCleanup();
 // ---- boot ----
 applyTheme();
 setConn(false);
+const savedDraft = localStorage.getItem(DRAFT_KEY);
+if (!input.value && savedDraft) { input.value = savedDraft; autoGrow(); }
 Promise.all([loadHistory(), loadPins()]).catch(() => {});
 refreshStorage().catch(() => {});
 connectWS();
