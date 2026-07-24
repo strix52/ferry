@@ -13,7 +13,7 @@ const PORT = Number(process.env.PORT) || 8787;
 // Remind once total stored file bytes cross this. Override with STORAGE_LIMIT_MB.
 const STORAGE_LIMIT_BYTES = (Number(process.env.STORAGE_LIMIT_MB) || 2048) * 1024 * 1024;
 
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.FERRY_DATA_DIR ? path.resolve(process.env.FERRY_DATA_DIR) : path.join(__dirname, "data");
 const FILES_DIR = path.join(DATA_DIR, "files");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const AUTH_FILE = path.join(DATA_DIR, "auth.json");
@@ -34,6 +34,9 @@ db.exec(`
     created_at  INTEGER NOT NULL
   );
 `);
+if (!db.prepare(`PRAGMA table_info(messages)`).all().some((column) => column.name === "pinned_at")) {
+  db.exec(`ALTER TABLE messages ADD COLUMN pinned_at INTEGER`);
+}
 
 const insertMsg = db.prepare(`
   INSERT INTO messages (kind, sender_id, sender_name, text, filename, stored_name, size, created_at)
@@ -41,6 +44,14 @@ const insertMsg = db.prepare(`
 `);
 const getMsg = db.prepare(`SELECT * FROM messages WHERE id = ?`);
 const listMsgs = db.prepare(`SELECT * FROM messages ORDER BY id ASC`);
+const listPins = db.prepare(`SELECT * FROM messages WHERE pinned_at IS NOT NULL ORDER BY pinned_at DESC, id DESC LIMIT 5`);
+const maxPinnedAt = db.prepare(`SELECT MAX(pinned_at) AS value FROM messages WHERE pinned_at IS NOT NULL`);
+const setPinnedAt = db.prepare(`UPDATE messages SET pinned_at = ? WHERE id = ?`);
+const clearPinnedAt = db.prepare(`UPDATE messages SET pinned_at = NULL WHERE id = ?`);
+const clearOldestPin = db.prepare(`
+  UPDATE messages SET pinned_at = NULL
+  WHERE id = (SELECT id FROM messages WHERE pinned_at IS NOT NULL ORDER BY pinned_at ASC, id ASC LIMIT 1)
+`);
 
 // ---- shared-token auth ----
 function readAuthConfig() {
@@ -116,9 +127,12 @@ function msgToClient(row) {
     filename: row.filename,
     size: row.size,
     deleted: !!row.deleted,
+    pinnedAt: row.pinned_at,
     createdAt: row.created_at,
   };
 }
+function pinsPayload() { return listPins.all().map(msgToClient); }
+function nextPinnedAt() { return Math.max(Date.now(), Number(maxPinnedAt.get().value || 0) + 1); }
 
 // ---- storage stats ----
 function storageStats() {
@@ -209,6 +223,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, listMsgs.all().map(msgToClient));
     }
 
+    if (req.method === "GET" && p === "/api/pins") {
+      if (!requireAuth(req, res, url)) return;
+      return send(res, 200, pinsPayload());
+    }
+
     if (req.method === "GET" && p === "/api/storage") {
       if (!requireAuth(req, res, url)) return;
       return send(res, 200, storageStats());
@@ -236,6 +255,21 @@ const server = http.createServer(async (req, res) => {
       const row = getMsg.get(info.lastInsertRowid);
       broadcast({ type: "message", message: msgToClient(row) });
       return send(res, 200, { ok: true, id: row.id });
+    }
+
+    if (req.method === "PUT" && /^\/api\/messages\/\d+\/pin$/.test(p)) {
+      if (!requireAuth(req, res, url)) return;
+      const id = Number(p.split("/")[3]);
+      const row = getMsg.get(id);
+      if (!row) return send(res, 404, { error: "not found" });
+      const { pinned } = await readJsonBody(req);
+      if (pinned) {
+        if (!row.pinned_at && listPins.all().length >= 5) clearOldestPin.run();
+        setPinnedAt.run(nextPinnedAt(), id);
+      } else clearPinnedAt.run(id);
+      const pins = pinsPayload();
+      broadcast({ type: "pins", pins });
+      return send(res, 200, { ok: true, pins });
     }
 
     if (req.method === "POST" && p === "/api/upload") {

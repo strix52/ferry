@@ -34,6 +34,8 @@ const scrollArea = $("#scrollableArea");
 let cachedMessages = [];   // for cleanup impact preview
 let lastStorage = null;
 let lastInfo = null;
+let pinnedItems = [];
+let pinsExpanded = false;
 
 // ---- helpers ----
 function fmtBytes(n) {
@@ -104,6 +106,29 @@ function avatarFor(name, mine) {
 }
 function atBottom() { return scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight < 90; }
 function scrollDown() { scrollArea.scrollTop = scrollArea.scrollHeight; }
+function pinActionHtml(m) {
+  const label = m.pinnedAt ? "Unpin" : "Pin";
+  return `<button class="act btn-pin" data-id="${m.id}" data-pinned="${m.pinnedAt ? "true" : "false"}">${label}</button>`;
+}
+function pinPreview(m) { return m.kind === "file" ? (m.deleted ? `${m.filename} · removed` : m.filename) : (m.text || "(empty message)"); }
+function renderPins() {
+  const strip = $("#pinnedStrip");
+  strip.classList.toggle("hidden", !pinnedItems.length);
+  if (!pinnedItems.length) { strip.innerHTML = ""; return; }
+  const items = pinsExpanded ? `<div class="pinned-items">${pinnedItems.map((m) => `<div class="pinned-item ${m.deleted ? "gone" : ""}"><span class="pinned-kind">${m.kind === "file" ? "File" : "Note"}</span><span class="pinned-preview">${escapeHtml(pinPreview(m))}</span><button class="act btn-pin" data-id="${m.id}" data-pinned="true">Unpin</button></div>`).join("")}</div>` : "";
+  strip.innerHTML = `<button class="pinned-toggle" type="button" aria-expanded="${pinsExpanded}">${icon("i-link", "ico ico-sm")} Pinned · ${pinnedItems.length}</button>${items}`;
+}
+async function applyPins(pins) {
+  pinnedItems = pins;
+  const pinnedById = new Map(pins.map((m) => [m.id, m.pinnedAt]));
+  cachedMessages.forEach((m) => { m.pinnedAt = pinnedById.get(m.id) || null; });
+  renderPins();
+  await loadHistory();
+}
+async function setPinned(id, pinned) {
+  const result = await apiJson(`/api/messages/${id}/pin`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pinned }) });
+  await applyPins(result.pins);
+}
 function dragFilename(m) {
   if (m.kind === "file") return m.filename;
   return `Ferry message ${new Date(m.createdAt).toISOString().slice(0, 16).replace(/[T:]/g, "-")}.txt`;
@@ -125,10 +150,12 @@ function actionsHtml(m) {
     return `
       <button class="act btn-open" data-id="${m.id}">${icon("i-open", "ico ico-sm")} Open</button>
       <button class="act btn-reveal" data-id="${m.id}" title="Show in folder">${icon("i-folder", "ico ico-sm")} Folder</button>
+      ${pinActionHtml(m)}
       <a class="act icon-only dl" href="${withAuth(`/api/download/${m.id}`)}" download title="Download">${icon("i-download", "ico ico-sm")}</a>`;
   }
   return `
     <a class="act primary dl" href="${withAuth(`/api/download/${m.id}`)}" download>${icon("i-download", "ico ico-sm")} Download</a>
+    ${pinActionHtml(m)}
     <button class="act btn-open" data-id="${m.id}" title="Open on laptop">${icon("i-open", "ico ico-sm")} Open on laptop</button>`;
 }
 function buildNode(m, prev) {
@@ -151,7 +178,7 @@ function buildNode(m, prev) {
   const avatar = grouped ? `<div class="avatar spacer"></div>` : avatarFor(m.senderName, mine);
   const meta = grouped ? "" :
     `<div class="meta"><span class="who">${escapeHtml(m.senderName)}</span><span>${fmtTime(m.createdAt)}</span></div>`;
-  const body = m.kind === "file" ? (m.deleted ? goneCard(m) : fileCard(m)) : `<div class="bubble">${linkify(m.text || "")}</div>`;
+  const body = m.kind === "file" ? (m.deleted ? goneCard(m) : fileCard(m)) : `<div class="text-card"><div class="bubble">${linkify(m.text || "")}</div><div class="message-actions">${pinActionHtml(m)}</div></div>`;
 
   row.innerHTML = `${avatar}<div class="bubble-col">${meta}${body}</div>`;
   return row;
@@ -231,6 +258,7 @@ async function loadHistory() {
   }
   scrollDown();
 }
+async function loadPins() { pinnedItems = await apiJson("/api/pins"); renderPins(); }
 
 // ---- sending ----
 async function sendText() {
@@ -496,6 +524,7 @@ function connectWS() {
   ws.onmessage = (ev) => {
     const data = JSON.parse(ev.data);
     if (data.type === "message") addMessage(data.message);
+    else if (data.type === "pins") applyPins(data.pins);
     else if (data.type === "storage") refreshStorage(data.storage);
     else if (data.type === "cleanup") loadHistory();
     else if (data.type === "auth") showAuthRequired();
@@ -534,9 +563,17 @@ thread.addEventListener("click", (e) => {
   const open = e.target.closest(".btn-open");
   const reveal = e.target.closest(".btn-reveal");
   const thumb = e.target.closest(".thumb-wrap");
+  const pin = e.target.closest(".btn-pin");
   if (open) { e.preventDefault(); apiFetch(`/api/open/${open.dataset.id}`, { method: "POST" }).catch(() => {}); }
   else if (reveal) { e.preventDefault(); apiFetch(`/api/reveal/${reveal.dataset.id}`, { method: "POST" }).catch(() => {}); }
+  else if (pin) { e.preventDefault(); setPinned(pin.dataset.id, pin.dataset.pinned !== "true").catch(() => {}); }
   else if (thumb) { openLightbox(thumb.dataset.img, thumb.dataset.name); }
+});
+$("#pinnedStrip").addEventListener("click", (e) => {
+  const toggle = e.target.closest(".pinned-toggle");
+  const pin = e.target.closest(".btn-pin");
+  if (toggle) { pinsExpanded = !pinsExpanded; renderPins(); }
+  else if (pin) setPinned(pin.dataset.id, false).catch(() => {});
 });
 function openLightbox(src, alt) {
   const lb = document.createElement("div");
@@ -584,6 +621,6 @@ wireCleanup();
 // ---- boot ----
 applyTheme();
 setConn(false);
-loadHistory().catch(() => {});
+Promise.all([loadHistory(), loadPins()]).catch(() => {});
 refreshStorage().catch(() => {});
 connectWS();

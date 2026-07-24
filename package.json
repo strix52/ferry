@@ -6,6 +6,7 @@
   "description": "LAN-only chat + file transfer thread between phone and laptop",
   "scripts": {
     "start": "node server.js",
+    "test": "node --test",
     "build:tray": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/Build-FerryTray.ps1",
     "tray": ".\\bin\\FerryTray.exe --project . --port 8787",
     "install:windows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/Install-FerryWindows.ps1",
