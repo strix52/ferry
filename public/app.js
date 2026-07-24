@@ -104,6 +104,20 @@ function avatarFor(name, mine) {
 }
 function atBottom() { return scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight < 90; }
 function scrollDown() { scrollArea.scrollTop = scrollArea.scrollHeight; }
+function dragFilename(m) {
+  if (m.kind === "file") return m.filename;
+  return `Ferry message ${new Date(m.createdAt).toISOString().slice(0, 16).replace(/[T:]/g, "-")}.txt`;
+}
+function startExportDrag(e, m) {
+  if (!e.dataTransfer) return;
+  const url = new URL(withAuth(m.kind === "file" ? `/api/download/${m.id}` : `/api/export-message/${m.id}`), location.href).href;
+  const filename = dragFilename(m).replace(/[\r\n:]/g, "-");
+  e.dataTransfer.effectAllowed = "copy";
+  // Chromium on Windows recognises DownloadURL as a real file drag to Explorer/Desktop.
+  e.dataTransfer.setData("DownloadURL", `application/octet-stream:${filename}:${url}`);
+  e.dataTransfer.setData("text/uri-list", url);
+  e.dataTransfer.setData("text/plain", m.kind === "text" ? (m.text || "") : m.filename);
+}
 
 // ---- file/message rendering ----
 function actionsHtml(m) {
@@ -127,6 +141,12 @@ function buildNode(m, prev) {
   row.dataset.id = m.id;
   row.dataset.sender = m.senderId;
   row.dataset.ts = m.createdAt;
+  if (!m.deleted) {
+    row.draggable = true;
+    row.classList.add("draggable");
+    row.title = "Drag to save on this computer";
+    row.addEventListener("dragstart", (e) => startExportDrag(e, m));
+  }
 
   const avatar = grouped ? `<div class="avatar spacer"></div>` : avatarFor(m.senderName, mine);
   const meta = grouped ? "" :
@@ -489,7 +509,14 @@ function autoGrow() {
   input.style.height = Math.min(input.scrollHeight, 120) + "px";
 }
 input.addEventListener("input", autoGrow);
-input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } });
+input.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+  // Phone keyboards can emit Enter when confirming a paste. Keep the pasted text editable;
+  // the visible Send button remains the deliberate send action on touch devices.
+  if (window.matchMedia("(pointer: coarse)").matches) return;
+  e.preventDefault();
+  sendText();
+});
 sendBtn.addEventListener("click", sendText);
 $("#attachBtn").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => { if (fileInput.files.length) uploadFiles([...fileInput.files]); fileInput.value = ""; });
@@ -521,11 +548,21 @@ function openLightbox(src, alt) {
   document.body.appendChild(lb);
 }
 
-// drag & drop (desktop)
+// drop files from the desktop into Ferry
 const dropHint = $("#dropHint");
-window.addEventListener("dragover", (e) => { e.preventDefault(); dropHint.classList.remove("hidden"); });
+const isFileDrag = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+window.addEventListener("dragover", (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  dropHint.classList.remove("hidden");
+});
 window.addEventListener("dragleave", (e) => { if (e.relatedTarget === null) dropHint.classList.add("hidden"); });
-window.addEventListener("drop", (e) => { e.preventDefault(); dropHint.classList.add("hidden"); if (e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]); });
+window.addEventListener("drop", (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  dropHint.classList.add("hidden");
+  if (e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]);
+});
 
 // connect modal controls
 $("#connectBtn").addEventListener("click", openConnect);

@@ -278,6 +278,21 @@ const server = http.createServer(async (req, res) => {
       return fs.createReadStream(fp).pipe(res);
     }
 
+    if (req.method === "GET" && p.startsWith("/api/export-message/")) {
+      if (!requireAuth(req, res, url)) return;
+      const id = Number(p.split("/").pop());
+      const row = getMsg.get(id);
+      if (!row || row.kind !== "text") return send(res, 404, { error: "not found" });
+      const filename = `Ferry message ${new Date(row.created_at).toISOString().slice(0, 16).replace(/[T:]/g, "-")}.txt`;
+      const body = Buffer.from(row.text || "", "utf8");
+      res.writeHead(200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": body.length,
+      });
+      return res.end(body);
+    }
+
     if (req.method === "POST" && p.startsWith("/api/open/")) {
       if (!requireAuth(req, res, url)) return;
       const id = Number(p.split("/").pop());

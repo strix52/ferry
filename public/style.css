@@ -282,6 +282,8 @@ body {
 }
 .msg.mine { flex-direction: row-reverse; }
 .msg.grouped { margin-top: 3px; }
+.msg.draggable { cursor: grab; }
+.msg.draggable:active { cursor: grabbing; }
 
 @keyframes pop {
   from { opacity: 0; transform: translateY(10px); }
