@@ -40,6 +40,8 @@ const DRAFT_KEY = "ferry_draft_v1";
 const READ_KEY = "ferry_last_read_message_id_v1";
 let lastReadId = Number(localStorage.getItem(READ_KEY) || 0);
 let draftTimer = null;
+let uploadQueue = [];
+let uploadRunning = false;
 
 // ---- helpers ----
 function fmtBytes(n) {
@@ -314,11 +316,68 @@ async function sendText() {
   autoGrow();
 }
 async function uploadFiles(files) {
-  for (const f of files) {
-    const q = new URLSearchParams({ name: f.name, senderId: device.id, senderName: device.name });
-    if (authToken) q.set("token", authToken);
-    await apiFetch(`/api/upload?${q}`, { method: "POST", body: f });
-  }
+  enqueueFiles(files);
+}
+function renderUploadQueue() {
+  const box = $("#uploadQueue");
+  box.classList.toggle("hidden", uploadQueue.length === 0);
+  box.innerHTML = uploadQueue.map((entry) => {
+    const progress = entry.status === "uploading" ? `<div class="upload-progress"><span style="width:${entry.progress}%"></span></div><span>${entry.progress}%</span>` : "";
+    const action = entry.status === "failed" ? `<button class="act queue-retry" data-id="${entry.id}">Retry</button>` : `<button class="act queue-remove" data-id="${entry.id}">${entry.status === "uploading" ? "Cancel" : "Remove"}</button>`;
+    const status = entry.status === "failed" ? `<span class="upload-error">${escapeHtml(entry.error || "Upload failed")}</span>` : `<span class="upload-status">${entry.status === "waiting" ? "Waiting" : "Uploading"}</span>`;
+    return `<div class="upload-row"><span class="upload-name">${escapeHtml(entry.file.name)}</span>${status}${progress}${action}</div>`;
+  }).join("");
+}
+function enqueueFiles(files) {
+  for (const file of files) uploadQueue.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, file, status: "waiting", progress: 0, error: "", xhr: null });
+  renderUploadQueue();
+  processUploadQueue();
+}
+function processUploadQueue() {
+  if (uploadRunning) return;
+  const entry = uploadQueue.find((item) => item.status === "waiting");
+  if (!entry) return;
+  uploadRunning = true;
+  entry.status = "uploading";
+  renderUploadQueue();
+  const q = new URLSearchParams({ name: entry.file.name, senderId: device.id, senderName: device.name });
+  if (authToken) q.set("token", authToken);
+  const xhr = entry.xhr = new XMLHttpRequest();
+  xhr.open("POST", `/api/upload?${q}`);
+  if (authToken) xhr.setRequestHeader("X-Ferry-Token", authToken);
+  xhr.upload.onprogress = (event) => {
+    if (!event.lengthComputable) return;
+    entry.progress = Math.round((event.loaded / event.total) * 100);
+    renderUploadQueue();
+  };
+  const finish = (failed = "") => {
+    uploadRunning = false;
+    if (!uploadQueue.includes(entry)) { processUploadQueue(); return; }
+    if (failed) { entry.status = "failed"; entry.error = failed; entry.xhr = null; }
+    else uploadQueue = uploadQueue.filter((item) => item !== entry);
+    renderUploadQueue();
+    processUploadQueue();
+  };
+  xhr.onload = () => finish(xhr.status >= 200 && xhr.status < 300 ? "" : `Upload failed (${xhr.status})`);
+  xhr.onerror = () => finish("Network error");
+  xhr.onabort = () => finish("Cancelled");
+  xhr.send(entry.file);
+}
+function removeQueuedUpload(id) {
+  const entry = uploadQueue.find((item) => item.id === id);
+  if (!entry) return;
+  if (entry.status === "uploading") entry.xhr?.abort();
+  uploadQueue = uploadQueue.filter((item) => item !== entry);
+  renderUploadQueue();
+  processUploadQueue();
+}
+function retryQueuedUpload(id) {
+  const entry = uploadQueue.find((item) => item.id === id);
+  if (!entry || entry.status !== "failed") return;
+  entry.status = "waiting"; entry.progress = 0; entry.error = "";
+  uploadQueue = [entry, ...uploadQueue.filter((item) => item !== entry)];
+  renderUploadQueue();
+  processUploadQueue();
 }
 
 // ---- storage / settings ----
@@ -609,6 +668,12 @@ sendBtn.addEventListener("click", sendText);
 $("#attachBtn").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => { if (fileInput.files.length) uploadFiles([...fileInput.files]); fileInput.value = ""; });
 scrollArea.addEventListener("scroll", markReadAtBottom);
+$("#uploadQueue").addEventListener("click", (e) => {
+  const retry = e.target.closest(".queue-retry");
+  const remove = e.target.closest(".queue-remove");
+  if (retry) retryQueuedUpload(retry.dataset.id);
+  else if (remove) removeQueuedUpload(remove.dataset.id);
+});
 
 // device rename (from settings)
 function commitDeviceName() {
