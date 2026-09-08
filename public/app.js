@@ -634,11 +634,21 @@ function setConn(on) {
   $("#connDot").classList.toggle("on", on);
   $("#deviceLabel").textContent = on ? `This device: ${device.name}` : "Reconnecting...";
 }
+let wsFirstConnect = true;
 function connectWS() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const qs = authQuery();
   const ws = new WebSocket(`${proto}://${location.host}/ws${qs ? `?${qs}` : ""}`);
-  ws.onopen = () => setConn(true);
+  ws.onopen = () => {
+    setConn(true);
+    // A fresh socket may have missed broadcasts while we were away
+    // (background tab, Doze, WiFi roam): catch up instead of staying stale.
+    if (!wsFirstConnect) {
+      loadHistory().catch(() => {});
+      loadPins().catch(() => {});
+    }
+    wsFirstConnect = false;
+  };
   ws.onmessage = (ev) => {
     const data = JSON.parse(ev.data);
     if (data.type === "message") addMessage(data.message);
