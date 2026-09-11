@@ -4,35 +4,35 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$AppDir = Join-Path $env:LOCALAPPDATA "Ferry\app"
+$InstalledExe = Join-Path $AppDir "Ferry.exe"
 $StartMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $StartupDir = Join-Path $StartMenuDir "Startup"
 $StartMenuShortcut = Join-Path $StartMenuDir "Ferry.lnk"
+$WpfShortcut = Join-Path $StartMenuDir "Ferry (WPF).lnk"
 $StartupShortcut = Join-Path $StartupDir "Ferry.lnk"
-$PidFile = Join-Path $ProjectRoot "data\ferry.pid"
 $RunKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 
 Remove-Item -LiteralPath $StartMenuShortcut -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $WpfShortcut -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $StartupShortcut -Force -ErrorAction SilentlyContinue
 Remove-ItemProperty -Path $RunKey -Name "Ferry" -Force -ErrorAction SilentlyContinue
 
-Get-CimInstance Win32_Process -Filter "name = 'FerryTray.exe'" |
-  Where-Object { $_.CommandLine -like "*$ProjectRoot*" } |
-  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Stop running Ferry processes
+Get-Process -Name "Ferry" -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 
-Get-CimInstance Win32_Process -Filter "name = 'powershell.exe'" |
-  Where-Object { $_.CommandLine -like "*Ferry.Tray.ps1*" -and $_.CommandLine -like "*$ProjectRoot*" } |
-  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-
-if (Test-Path -LiteralPath $PidFile) {
-  $pidText = (Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
-  $serverPid = 0
-  if ([int]::TryParse($pidText, [ref]$serverPid)) {
-    $proc = Get-Process -Id $serverPid -ErrorAction SilentlyContinue
-    if ($proc -and $proc.ProcessName -eq "node") {
-      Stop-Process -Id $serverPid -Force -ErrorAction SilentlyContinue
-    }
-  }
-  Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+# Firewall rule cleanup
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if ($isAdmin) {
+  try {
+    Get-NetFirewallRule -DisplayName "Ferry" -ErrorAction SilentlyContinue | Where-Object {
+      ($_ | Get-NetFirewallApplicationFilter).Program -eq $InstalledExe
+    } | Remove-NetFirewallRule -ErrorAction SilentlyContinue
+  } catch { }
+} else {
+  Write-Host "To remove the firewall rule, run this in an elevated PowerShell prompt:"
+  Write-Host "Get-NetFirewallRule -DisplayName `"Ferry`" | Where-Object { (`$_ | Get-NetFirewallApplicationFilter).Program -eq `"$InstalledExe`" } | Remove-NetFirewallRule"
 }
 
-Write-Host "Removed Ferry Start menu shortcut and autostart entry."
+Write-Host "Removed Ferry Start menu shortcuts and autostart entry."

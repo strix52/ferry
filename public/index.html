@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#121013" />
+  <meta name="theme-color" content="#111614" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F4F3EF" media="(prefers-color-scheme: light)" />
   <title>Ferry</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <script>
@@ -22,7 +23,7 @@
 
   <!-- ===== inline SVG icon library ===== -->
   <svg id="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M3 14h18l-1.7 4.2a2 2 0 0 1-1.85 1.25H6.55A2 2 0 0 1 4.7 18.2L3 14z"/><path d="M6.5 14V8.5h8l3.2 5.5"/><path d="M10 8.5V5.2h3.2"/><path d="M2 21.2c1.4 0 1.4-1 2.7-1s1.35 1 2.7 1 1.35-1 2.7-1 1.35 1 2.7 1 1.35-1 2.7-1 1.35 1 2.7 1"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M3 6.7c2.6-2 4.7-2 7.3 0s4.7 2 10.7 0"/><path d="M3 12c2.6-2 4.7-2 7.3 0s4.7 2 10.7 0"/><path d="M3 17.3c2.6-2 4.7-2 7.3 0s4.7 2 10.7 0"/></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M9 12a3 3 0 0 0 3 3h2a3 3 0 0 0 0-6h-1"/><path d="M15 12a3 3 0 0 0-3-3h-2a3 3 0 0 0 0 6h1"/></symbol>
     <symbol id="i-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -56,16 +57,17 @@
         <div class="brand-sub">
           <span class="conn-dot" id="connDot"></span>
           <span id="deviceLabel">Connecting...</span>
+          <span id="presenceDot" aria-live="polite"></span>
           <span class="unread-badge hidden" id="unreadCount" aria-live="polite"></span>
         </div>
       </div>
     </div>
     <div class="header-actions">
-      <button class="chip" id="connectBtn" title="Connect a device">
+      <button class="chip" id="connectBtn" title="Pair a phone">
         <svg class="ico ico-sm"><use href="#i-qr"/></svg>
         <span class="label">Connect</span>
       </button>
-      <button class="chip chip-icon" id="settingsBtn" title="Settings">
+      <button class="chip chip-icon" id="settingsBtn" title="Settings" aria-label="Settings">
         <svg class="ico ico-sm"><use href="#i-gear"/></svg>
       </button>
     </div>
@@ -75,14 +77,14 @@
   <div class="hidden" id="connectModal">
     <div class="connect-card">
       <div class="panel-head">
-        <h3>Connect a device</h3>
-        <button class="icon-x" id="closeConnect"><svg class="ico ico-sm"><use href="#i-close"/></svg></button>
+        <h3>Pair a phone</h3>
+        <button class="icon-x" id="closeConnect" aria-label="Close connection panel"><svg class="ico ico-sm"><use href="#i-close"/></svg></button>
       </div>
-      <p class="panel-note">Scan this with your phone, then open the link. It uses this laptop's current address, so it keeps working if the IP changes.</p>
+      <p class="panel-note">Scan the QR code with your phone.</p>
       <div class="qr-box" id="qrBox"></div>
       <div class="url-row">
         <code id="connectUrl">...</code>
-        <button class="url-copy" id="copyUrl" title="Copy link"><svg class="ico ico-sm"><use href="#i-copy"/></svg></button>
+        <button class="url-copy" id="copyUrl" title="Copy link" aria-label="Copy pairing link"><svg class="ico ico-sm"><use href="#i-copy"/></svg></button>
       </div>
       <div class="url-alt" id="connectAlt"></div>
     </div>
@@ -93,7 +95,7 @@
   <aside class="hidden" id="settingsDrawer" aria-label="Settings">
     <header class="drawer-head">
       <h2>Settings</h2>
-      <button class="icon-x" id="closeSettings"><svg class="ico"><use href="#i-close"/></svg></button>
+      <button class="icon-x" id="closeSettings" aria-label="Close settings"><svg class="ico"><use href="#i-close"/></svg></button>
     </header>
     <div class="drawer-body">
 
@@ -103,7 +105,6 @@
         <div class="set-row stack">
           <div class="set-row-text">
             <div class="set-row-title">Theme</div>
-            <div class="set-row-desc">Use your system setting or choose a theme here.</div>
           </div>
           <div class="seg" id="themeSeg" role="group" aria-label="Theme">
             <button data-theme="light">Light</button>
@@ -119,7 +120,7 @@
         <div class="set-row">
           <div class="set-row-text">
             <div class="set-row-title">Device name</div>
-            <div class="set-row-desc">Shown next to your messages.</div>
+            <div class="set-row-desc">Shown with your messages.</div>
           </div>
           <div class="set-row-control">
             <input id="deviceNameInput" class="set-input" maxlength="40" placeholder="Name" />
@@ -132,16 +133,15 @@
         <div class="set-label">Security</div>
         <div class="set-row stack">
           <div class="set-row-text">
-            <div class="set-row-title">Shared token</div>
-            <div class="set-row-desc">Only devices opened from your Ferry QR code can use this thread.</div>
+            <div class="set-row-title">Pairing</div>
           </div>
           <div class="security-box">
-            <div class="security-status" id="authStatus">Checking pairing...</div>
+            <div class="security-status" id="authStatus">Checking...</div>
             <div class="security-actions">
-              <button class="set-button" id="copyPairLink">Copy pairing link</button>
+              <button class="set-button" id="copyPairLink">Copy link</button>
               <button class="set-button danger" id="rotateToken">Rotate token</button>
             </div>
-            <div class="impact" id="authImpact">Rotating the token signs out other devices until they scan the QR again.</div>
+            <div class="impact" id="authImpact">Rotating signs out paired devices.</div>
           </div>
         </div>
       </section>
@@ -154,14 +154,14 @@
             <span id="storageUsed">0 B</span>
             <span class="storage-of" id="storageLimit">of 0 B</span>
           </div>
-          <div class="meter"><div class="meter-fill" id="meterFill" style="width:0%"></div></div>
+          <div class="meter"><div class="meter-fill" id="meterFill" style="--progress:0"></div></div>
           <div class="storage-stats" id="storageStats"></div>
         </div>
 
         <div class="set-row stack">
           <div class="set-row-text">
-            <div class="set-row-title">Clean up old files</div>
-            <div class="set-row-desc">Delete old file uploads. Messages stay in the thread.</div>
+            <div class="set-row-title">Clean up files</div>
+            <div class="set-row-desc">Deletes stored files; keeps thread entries.</div>
           </div>
           <div class="cleanup-control">
             <div class="seg" id="cleanupSeg" role="group" aria-label="File age">
@@ -171,9 +171,9 @@
               <button data-days="custom">Custom</button>
             </div>
             <input id="cleanupCustom" class="set-input hidden" type="number" min="1" max="3650" placeholder="Days" />
-            <div class="impact" id="cleanupImpact">Pick an age to preview what gets removed.</div>
+            <div class="impact" id="cleanupImpact">Choose an age.</div>
             <button class="btn-danger" id="cleanupRun" disabled>
-              <svg class="ico ico-sm"><use href="#i-trash"/></svg> <span id="cleanupRunLabel">Delete old files</span>
+              <svg class="ico ico-sm"><use href="#i-trash"/></svg> <span id="cleanupRunLabel">Delete files</span>
             </button>
           </div>
         </div>
@@ -186,11 +186,11 @@
           <div class="about-brand">
             <div class="brand-mark sm"><svg class="ico"><use href="#i-logo"/></svg></div>
             <div>
-              <div class="about-name">Ferry <span class="about-ver">v0.2</span></div>
-              <div class="about-tag">Notes and files on your own network</div>
+              <div class="about-name">Ferry <span class="about-ver">v0.15.0</span></div>
+              <div class="about-tag">Local notes and files</div>
             </div>
           </div>
-          <p class="about-note">Ferry stays on your local network. Your laptop stores the thread and files.</p>
+          <p class="about-note">Stored on this laptop.</p>
         </div>
       </section>
 
@@ -200,26 +200,27 @@
   <!-- ===== reminder banner ===== -->
   <div class="hidden" id="reminder"></div>
 
+  <section id="pinnedStrip" class="hidden" aria-label="Pinned items"></section>
+
   <!-- ===== thread ===== -->
   <main id="scrollableArea">
     <div id="dropHint" class="hidden">
       <svg class="ico"><use href="#i-download"/></svg>
       <span>Drop files to send</span>
     </div>
-    <section id="pinnedStrip" class="hidden" aria-label="Pinned items"></section>
+    <section id="uploadQueue" class="hidden" aria-label="Upload queue" aria-live="polite"></section>
     <div id="thread"></div>
   </main>
 
   <!-- ===== composer ===== -->
   <div id="composer">
-    <div id="uploadQueue" class="hidden" aria-live="polite"></div>
     <div class="composer-inner">
       <input class="hidden" id="fileInput" multiple type="file" />
       <button class="icon-btn" id="attachBtn" title="Send file" aria-label="Send file"><svg class="ico"><use href="#i-add"/></svg></button>
       <div class="input-wrap">
         <textarea id="input" placeholder="Type a message..." rows="1" enterkeyhint="enter" aria-label="Message"></textarea>
       </div>
-      <button id="sendBtn" title="Send" aria-label="Send message"><svg class="ico"><use href="#i-send"/></svg></button>
+      <button id="sendBtn" title="Send" aria-label="Send message" disabled><svg class="ico"><use href="#i-send"/></svg></button>
     </div>
   </div>
 

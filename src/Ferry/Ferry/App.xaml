@@ -1,0 +1,19 @@
+<Application x:Class="Ferry.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- Index 0 is the palette and is swapped wholesale when Windows
+                 changes theme (see App.ApplyTheme). Index 1 is the control
+                 library, which never changes: it reaches the palette through
+                 DynamicResource, so a swap repaints it for free. Keep this
+                 order. -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Light.xaml" />
+                <ResourceDictionary Source="Themes/Controls.xaml" />
+                <ResourceDictionary Source="Themes/Icons.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

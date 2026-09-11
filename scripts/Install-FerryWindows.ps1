@@ -5,54 +5,87 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$PowerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-$TrayScript = Join-Path $ProjectRoot "scripts\Ferry.Tray.ps1"
-$BuildScript = Join-Path $ProjectRoot "scripts\Build-FerryTray.ps1"
-$TrayExe = Join-Path $ProjectRoot "bin\FerryTray.exe"
-$DataDir = Join-Path $ProjectRoot "data"
-$IconFile = Join-Path $DataDir "ferry.ico"
+$AppDir = Join-Path $env:LOCALAPPDATA "Ferry\app"
+$InstalledExe = Join-Path $AppDir "Ferry.exe"
 $StartMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $StartMenuShortcut = Join-Path $StartMenuDir "Ferry.lnk"
+$WpfShortcut = Join-Path $StartMenuDir "Ferry (WPF).lnk"
 $OldStartupShortcut = Join-Path (Join-Path $StartMenuDir "Startup") "Ferry.lnk"
 $RunKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+$Csproj = Join-Path $ProjectRoot "src\Ferry\Ferry\Ferry.csproj"
 
-if (!(Test-Path -LiteralPath $TrayScript)) {
-  throw "Missing tray script: $TrayScript"
-}
+$StagingDir = Join-Path $env:TEMP ("ferry-staging-" + [System.Guid]::NewGuid().ToString("N"))
 
-if (!(Test-Path -LiteralPath $DataDir)) {
-  New-Item -ItemType Directory -Path $DataDir | Out-Null
-}
+try {
+  Write-Host "Publishing Ferry to staging ($StagingDir)..."
+  dotnet publish $Csproj -c Release -p:PublishSingleFile=true --self-contained false -o $StagingDir
+  if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish failed with exit code $LASTEXITCODE"
+  }
 
-& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -STA -File $TrayScript -ProjectRoot $ProjectRoot -Port $Port -GenerateIconOnly
-& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $BuildScript -ProjectRoot $ProjectRoot
+  if (!(Test-Path -LiteralPath $AppDir)) {
+    New-Item -ItemType Directory -Path $AppDir | Out-Null
+  }
 
-$arguments = "--project `"$ProjectRoot`" --port $Port"
+  Write-Host "Deploying to $AppDir..."
+  Copy-Item -Path (Join-Path $StagingDir "*") -Destination $AppDir -Recurse -Force
 
-function New-FerryShortcut {
-  param(
-    [string]$Path,
-    [switch]$NoOpen
-  )
+  $indexHtml = Join-Path $AppDir "public\index.html"
+  if (!(Test-Path -LiteralPath $indexHtml)) {
+    throw "FATAL: $indexHtml is absent after copy! Phone client will fail with 404."
+  }
+  Write-Host "Verified phone client asset: $indexHtml"
 
+  # Clean up old shortcuts (F6)
+  Remove-Item -LiteralPath $WpfShortcut -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $OldStartupShortcut -Force -ErrorAction SilentlyContinue
+
+  # Create Start Menu shortcut
   $wsh = New-Object -ComObject WScript.Shell
-  $shortcut = $wsh.CreateShortcut($Path)
-  $shortcut.TargetPath = $TrayExe
-  $shortcut.Arguments = if ($NoOpen) { "$arguments --no-open" } else { $arguments }
-  $shortcut.WorkingDirectory = $ProjectRoot
-  $shortcut.IconLocation = $TrayExe
-  $shortcut.Description = "Start Ferry"
+  $shortcut = $wsh.CreateShortcut($StartMenuShortcut)
+  $shortcut.TargetPath = $InstalledExe
+  $shortcut.WorkingDirectory = $AppDir
+  $shortcut.IconLocation = $InstalledExe
+  $shortcut.Description = "Hand off text and files between this laptop and your phone."
   $shortcut.Save()
+
+  # Configure HKCU Run autostart (replacing F5)
+  $launchCommand = "`"$InstalledExe`""
+  Set-ItemProperty -Path $RunKey -Name "Ferry" -Value $launchCommand
+
+  # Firewall rule (F7)
+  $ruleName = "Ferry"
+  $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  if ($isAdmin) {
+    try {
+      $existing = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue | Where-Object {
+        ($_ | Get-NetFirewallApplicationFilter).Program -eq $InstalledExe
+      }
+      if (-not $existing) {
+        New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol TCP -Program $InstalledExe -Profile Public -Description "Allow inbound Ferry connections from phone" | Out-Null
+        Write-Host "Added firewall inbound allow rule for $InstalledExe (Public profile)."
+      } else {
+        Write-Host "Firewall rule for $InstalledExe already present."
+      }
+    } catch {
+      Write-Warning "Failed to set firewall rule: $($_.Exception.Message)"
+      Write-Host "Please run the following command in an elevated PowerShell prompt:"
+      Write-Host "New-NetFirewallRule -DisplayName `"$ruleName`" -Direction Inbound -Action Allow -Protocol TCP -Program `"$InstalledExe`" -Profile Public"
+    }
+  } else {
+    Write-Warning "Setting firewall rule requires elevation."
+    Write-Host "To allow inbound connections from your phone, run this in an elevated PowerShell prompt:"
+    Write-Host "New-NetFirewallRule -DisplayName `"$ruleName`" -Direction Inbound -Action Allow -Protocol TCP -Program `"$InstalledExe`" -Profile Public"
+  }
+
+  Write-Host ""
+  Write-Host "Installed Ferry:"
+  Write-Host "  Binary:     $InstalledExe"
+  Write-Host "  Start menu: $StartMenuShortcut"
+  Write-Host "  Autostart:  HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Ferry"
 }
-
-$launchCommand = "`"$TrayExe`" $arguments --no-open"
-New-FerryShortcut -Path $StartMenuShortcut
-Set-ItemProperty -Path $RunKey -Name "Ferry" -Value $launchCommand
-Remove-Item -LiteralPath $OldStartupShortcut -Force -ErrorAction SilentlyContinue
-
-Write-Host "Installed Ferry shortcuts:"
-Write-Host "  Start menu: $StartMenuShortcut"
-Write-Host "  Autostart:  HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Ferry"
-Write-Host ""
-Write-Host "Launch Ferry from Start, or run:"
-Write-Host "  `"$TrayExe`" --project `"$ProjectRoot`" --port $Port"
+finally {
+  if (Test-Path -LiteralPath $StagingDir) {
+    Remove-Item -LiteralPath $StagingDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}

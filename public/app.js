@@ -87,7 +87,7 @@ async function apiJson(url, opts = {}) {
 }
 function showAuthRequired() {
   const rem = $("#reminder");
-  rem.innerHTML = `${icon("i-warn", "ico ico-sm")}<span>Pair this device from Ferry on your laptop. Open Ferry there, press Connect, and scan the QR code.</span>`;
+  rem.innerHTML = `${icon("i-warn", "ico ico-sm")}<span>On your laptop: Connect → scan QR.</span>`;
   rem.classList.remove("hidden");
 }
 
@@ -101,14 +101,6 @@ function fileIconId(name) {
   if (["mp3", "wav", "flac", "ogg", "m4a", "aac"].includes(e)) return "i-audio";
   if (["zip", "rar", "7z", "tar", "gz", "bz2"].includes(e)) return "i-archive";
   return "i-file";
-}
-function avatarFor(name, mine) {
-  const n = (name || "").toLowerCase();
-  let inner;
-  if (n.includes("phone") || n.includes("mobile")) inner = icon("i-phone", "ico ico-sm");
-  else if (n.includes("laptop") || n.includes("pc") || n.includes("desktop") || n.includes("mac")) inner = icon("i-laptop", "ico ico-sm");
-  else inner = escapeHtml((name || "?").trim()[0] || "?").toUpperCase();
-  return `<div class="avatar ${mine ? "you" : ""}">${inner}</div>`;
 }
 function atBottom() { return scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight < 90; }
 function scrollDown() { scrollArea.scrollTop = scrollArea.scrollHeight; }
@@ -147,7 +139,21 @@ function renderPins() {
   const strip = $("#pinnedStrip");
   strip.classList.toggle("hidden", !pinnedItems.length);
   if (!pinnedItems.length) { strip.innerHTML = ""; return; }
-  const items = pinsExpanded ? `<div class="pinned-items">${pinnedItems.map((m) => `<div class="pinned-item ${m.deleted ? "gone" : ""}"><span class="pinned-kind">${m.kind === "file" ? "File" : "Note"}</span><span class="pinned-preview">${escapeHtml(pinPreview(m))}</span><button class="act btn-pin" data-id="${m.id}" data-pinned="true">Unpin</button></div>`).join("")}</div>` : "";
+  const items = pinsExpanded
+    ? `<div class="pinned-items">${pinnedItems.map((m) => {
+        const preview = escapeHtml(pinPreview(m));
+        const kindLabel = m.kind === "file" ? "File" : "Note";
+        const jumpLabel = `Jump to pinned ${kindLabel.toLowerCase()}: ${preview}`;
+        const unpinLabel = `Unpin ${preview}`;
+        return `<div class="pinned-item ${m.deleted ? "gone" : ""}">` +
+          `<button class="pinned-jump" type="button" data-id="${m.id}" aria-label="${jumpLabel}">` +
+            `<span class="pinned-kind">${kindLabel}</span>` +
+            `<span class="pinned-preview">${preview}</span>` +
+          `</button>` +
+          `<button class="act btn-pin" type="button" data-id="${m.id}" data-pinned="true" aria-label="${unpinLabel}">Unpin</button>` +
+        `</div>`;
+      }).join("")}</div>`
+    : "";
   strip.innerHTML = `<button class="pinned-toggle" type="button" aria-expanded="${pinsExpanded}">${icon("i-link", "ico ico-sm")} Pinned · ${pinnedItems.length}</button>${items}`;
 }
 async function applyPins(pins) {
@@ -207,12 +213,10 @@ function buildNode(m, prev) {
     row.addEventListener("dragstart", (e) => startExportDrag(e, m));
   }
 
-  const avatar = grouped ? `<div class="avatar spacer"></div>` : avatarFor(m.senderName, mine);
-  const meta = grouped ? "" :
-    `<div class="meta"><span class="who">${escapeHtml(m.senderName)}</span><span>${fmtTime(m.createdAt)}</span></div>`;
+  const meta = `<div class="passage-meta"><span>${fmtTime(m.createdAt)}</span><span class="who">${mine ? "You" : escapeHtml(m.senderName)}</span></div>`;
   const body = m.kind === "file" ? (m.deleted ? goneCard(m) : fileCard(m)) : `<div class="text-card"><div class="bubble">${linkify(m.text || "")}</div><div class="message-actions">${copyActionHtml(m)}${pinActionHtml(m)}</div></div>`;
 
-  row.innerHTML = `${avatar}<div class="bubble-col">${meta}${body}</div>`;
+  row.innerHTML = `${meta}<div class="passage-spine" aria-hidden="true"><span></span></div><div class="bubble-col">${body}</div>`;
   return row;
 }
 function goneCard(m) {
@@ -280,13 +284,14 @@ function renderEmpty() {
   thread.innerHTML = `<div class="empty">
     <div class="ring">${icon("i-logo")}</div>
     <h2>Nothing here yet</h2>
-    <p>Send a message or drop a file to start the thread between your phone and laptop.</p>
+    <p>Send a message or file.</p>
   </div>`;
 }
 async function loadHistory() {
   const msgs = await apiJson("/api/messages");
   cachedMessages = msgs;
   const latest = latestMessageId();
+  if (lastReadId > latest) { lastReadId = 0; localStorage.setItem(READ_KEY, "0"); }
   if (!lastReadId && latest) { lastReadId = latest; localStorage.setItem(READ_KEY, String(latest)); }
   thread.innerHTML = "";
   if (!msgs.length) { renderEmpty(); return; }
@@ -322,14 +327,26 @@ function renderUploadQueue() {
   const box = $("#uploadQueue");
   box.classList.toggle("hidden", uploadQueue.length === 0);
   box.innerHTML = uploadQueue.map((entry) => {
-    const progress = entry.status === "uploading" ? `<div class="upload-progress"><span style="width:${entry.progress}%"></span></div><span>${entry.progress}%</span>` : "";
+    const progress = entry.status === "uploading" ? `<div class="upload-progress"><span style="--progress:${entry.progress / 100}"></span></div><span class="upload-percent">${entry.progress}%</span>` : "";
     const action = entry.status === "failed" ? `<button class="act queue-retry" data-id="${entry.id}">Retry</button>` : `<button class="act queue-remove" data-id="${entry.id}">${entry.status === "uploading" ? "Cancel" : "Remove"}</button>`;
-    const status = entry.status === "failed" ? `<span class="upload-error">${escapeHtml(entry.error || "Upload failed")}</span>` : `<span class="upload-status">${entry.status === "waiting" ? "Waiting" : "Uploading"}</span>`;
-    return `<div class="upload-row"><span class="upload-name">${escapeHtml(entry.file.name)}</span>${status}${progress}${action}</div>`;
+    const status = entry.status === "failed" ? `<span class="upload-error">${escapeHtml(entry.error || "Upload failed")}</span>` : `<span class="upload-status">${entry.status === "waiting" ? "Waiting" : "Sending"}</span>`;
+    const visual = entry.previewUrl
+      ? `<img class="transfer-preview" src="${entry.previewUrl}" alt="" />`
+      : `<span class="transfer-glyph">${icon(fileIconId(entry.file.name))}</span>`;
+    return `<div class="upload-row ${entry.status === "uploading" ? "active" : ""}">
+      ${visual}
+      <div class="transfer-copy"><strong class="upload-name">${escapeHtml(entry.file.name)}</strong>${status}${progress}</div>
+      ${action}
+    </div>`;
   }).join("");
 }
 function enqueueFiles(files) {
-  for (const file of files) uploadQueue.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, file, status: "waiting", progress: 0, error: "", xhr: null });
+  for (const file of files) uploadQueue.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    file,
+    previewUrl: isThumbable(file.name) ? URL.createObjectURL(file) : "",
+    status: "waiting", progress: 0, error: "", xhr: null,
+  });
   renderUploadQueue();
   processUploadQueue();
 }
@@ -354,7 +371,10 @@ function processUploadQueue() {
     uploadRunning = false;
     if (!uploadQueue.includes(entry)) { processUploadQueue(); return; }
     if (failed) { entry.status = "failed"; entry.error = failed; entry.xhr = null; }
-    else uploadQueue = uploadQueue.filter((item) => item !== entry);
+    else {
+      if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
+      uploadQueue = uploadQueue.filter((item) => item !== entry);
+    }
     renderUploadQueue();
     processUploadQueue();
   };
@@ -367,6 +387,7 @@ function removeQueuedUpload(id) {
   const entry = uploadQueue.find((item) => item.id === id);
   if (!entry) return;
   if (entry.status === "uploading") entry.xhr?.abort();
+  if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
   uploadQueue = uploadQueue.filter((item) => item !== entry);
   renderUploadQueue();
   processUploadQueue();
@@ -391,12 +412,12 @@ async function refreshStorage(stats) {
     <div class="row"><span>Messages</span><span class="v">${s.messageCount}</span></div>`;
   const pct = Math.min(100, Math.round((s.fileBytes / s.limitBytes) * 100));
   const fill = $("#meterFill");
-  fill.style.width = pct + "%";
+  fill.style.setProperty("--progress", String(pct / 100));
   fill.classList.toggle("warn", s.overLimit);
 
   const rem = $("#reminder");
   if (s.overLimit) {
-    rem.innerHTML = `${icon("i-warn", "ico ico-sm")}<span>Storage is at ${fmtBytes(s.fileBytes)}, past your ${fmtBytes(s.limitBytes)} reminder. Open Settings to clean up.</span>`;
+    rem.innerHTML = `${icon("i-warn", "ico ico-sm")}<span>${fmtBytes(s.fileBytes)} of ${fmtBytes(s.limitBytes)} used. Clean up in Settings.</span>`;
     rem.classList.remove("hidden");
   } else rem.classList.add("hidden");
 }
@@ -424,16 +445,16 @@ function updateImpact() {
   const impact = $("#cleanupImpact");
   const label = $("#cleanupRunLabel");
   if (!cleanupDays || cleanupDays < 1) {
-    impact.textContent = "Pick an age to preview what gets removed.";
-    run.disabled = true; label.textContent = "Delete old files";
+    impact.textContent = "Choose an age.";
+    run.disabled = true; label.textContent = "Delete files";
     return;
   }
   const { n, bytes } = computeImpact(cleanupDays);
   if (n === 0) {
     impact.innerHTML = `Nothing older than <b>${cleanupDays} days</b>.`;
-    run.disabled = true; label.textContent = "Delete old files";
+    run.disabled = true; label.textContent = "Delete files";
   } else {
-    impact.innerHTML = `Removes <b>${n} file${n > 1 ? "s" : ""}</b> · frees <b>${fmtBytes(bytes)}</b>`;
+    impact.innerHTML = `<b>${n} file${n > 1 ? "s" : ""}</b> · <b>${fmtBytes(bytes)}</b>`;
     run.disabled = false; label.textContent = `Delete ${n} file${n > 1 ? "s" : ""}`;
   }
 }
@@ -461,7 +482,7 @@ function wireCleanup() {
     if (!cleanupArmed) {
       cleanupArmed = true;
       run.classList.add("armed");
-      $("#cleanupRunLabel").textContent = "Click again to confirm";
+      $("#cleanupRunLabel").textContent = "Confirm delete";
       cleanupArmTimer = setTimeout(() => { cleanupArmed = false; run.classList.remove("armed"); updateImpact(); }, 3000);
       return;
     }
@@ -470,7 +491,7 @@ function wireCleanup() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ days: cleanupDays }),
     })).json();
-    $("#cleanupImpact").innerHTML = `${icon("i-check", "ico ico-sm")} Removed ${r.removed} file${r.removed !== 1 ? "s" : ""}, freed ${fmtBytes(r.freedBytes)}.`;
+    $("#cleanupImpact").innerHTML = `${icon("i-check", "ico ico-sm")} Deleted ${r.removed} · ${fmtBytes(r.freedBytes)} freed`;
     run.disabled = true;
     await loadHistory();
     refreshStorage();
@@ -552,10 +573,10 @@ async function openConnect() {
   } catch {}
   if (!primary) primary = `${location.protocol}//${location.host}`;
   connectFullUrl = primary;
-  $("#connectUrl").textContent = primary.replace(/^https?:\/\//, "");
+  $("#connectUrl").textContent = new URL(primary, location.href).host;
   renderQR(primary);
   $("#connectAlt").innerHTML = alt.length
-    ? `<b>Also reachable at:</b> ${alt.map((u) => `<code>${u.replace(/^https?:\/\//, "")}</code>`).join(" · ")}` : "";
+    ? `<b>Also:</b> ${alt.map((u) => `<code>${new URL(u, location.href).host}</code>`).join(" · ")}` : "";
 }
 
 async function refreshAuthStatus() {
@@ -563,10 +584,10 @@ async function refreshAuthStatus() {
   try {
     const info = await apiJson("/api/info");
     lastInfo = info;
-    status.textContent = authToken || isLocalhost ? "Pairing is active." : "This device is not paired.";
+    status.textContent = authToken || isLocalhost ? "Paired" : "Not paired";
     status.classList.toggle("ok", !!(authToken || isLocalhost));
   } catch {
-    status.textContent = "Pair this device from the laptop QR code.";
+    status.textContent = "Scan the laptop QR.";
     status.classList.remove("ok");
   }
 }
@@ -593,7 +614,7 @@ async function rotateSharedToken() {
   const btn = $("#rotateToken");
   if (!rotateArmed) {
     rotateArmed = true;
-    btn.textContent = "Click again to rotate";
+    btn.textContent = "Confirm rotate";
     rotateTimer = setTimeout(disarmRotate, 3500);
     return;
   }
@@ -603,7 +624,7 @@ async function rotateSharedToken() {
   authToken = newUrl.searchParams.get("token") || authToken;
   if (authToken) localStorage.setItem(AUTH_KEY, authToken);
   lastInfo = data.info;
-  $("#authImpact").textContent = "Token rotated. Scan the new QR on other devices.";
+  $("#authImpact").textContent = "Rotated. Scan the new QR.";
   refreshAuthStatus();
   connectWS();
 }
@@ -617,7 +638,7 @@ function applyTheme() {
   const t = resolvedTheme();
   document.documentElement.dataset.theme = t;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", t === "light" ? "#f4f1f5" : "#121013");
+  if (meta) meta.setAttribute("content", t === "light" ? "#F4F3EF" : "#111614");
   document.querySelectorAll("#themeSeg button").forEach((b) => b.classList.toggle("on", b.dataset.theme === themePref));
 }
 themeMql.addEventListener("change", () => { if (themePref === "system") applyTheme(); });
@@ -632,13 +653,24 @@ document.querySelectorAll("#themeSeg button").forEach((b) =>
 // ---- websocket ----
 function setConn(on) {
   $("#connDot").classList.toggle("on", on);
-  $("#deviceLabel").textContent = on ? `This device: ${device.name}` : "Reconnecting...";
+  $("#deviceLabel").textContent = on
+    ? (isLocalhost ? "Ready" : "Connected")
+    : "Reconnecting...";
+}
+function renderPresence(list) {
+  const others = (list || []).filter((d) => d.id !== device.id);
+  const dot = $("#presenceDot");
+  dot.textContent = others.length === 1 ? `● ${others[0].name}` :
+    others.length > 1 ? `● ${others.length} attached` : "";
 }
 let wsFirstConnect = true;
 function connectWS() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const qs = authQuery();
-  const ws = new WebSocket(`${proto}://${location.host}/ws${qs ? `?${qs}` : ""}`);
+  const params = new URLSearchParams(qs);
+  params.set("senderId", device.id);
+  params.set("senderName", device.name);
+  const ws = new WebSocket(`${proto}://${location.host}/ws?${params}`);
   ws.onopen = () => {
     setConn(true);
     // A fresh socket may have missed broadcasts while we were away
@@ -650,22 +682,31 @@ function connectWS() {
     wsFirstConnect = false;
   };
   ws.onmessage = (ev) => {
-    const data = JSON.parse(ev.data);
+    if (typeof ev.data !== "string" || !ev.data) return;
+    let data;
+    try { data = JSON.parse(ev.data); } catch { return; }
     if (data.type === "message") addMessage(data.message);
     else if (data.type === "pins") applyPins(data.pins);
     else if (data.type === "storage") refreshStorage(data.storage);
     else if (data.type === "cleanup") loadHistory();
+    else if (data.type === "presence") renderPresence(data.presence || []);
     else if (data.type === "auth") showAuthRequired();
   };
   ws.onclose = () => { setConn(false); setTimeout(connectWS, authToken ? 1500 : 5000); };
 }
 
 // ---- input UX ----
+function updateSendState() {
+  const hasText = !!input.value.trim();
+  sendBtn.disabled = !hasText;
+  sendBtn.setAttribute("aria-disabled", String(!hasText));
+}
 function autoGrow() {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 120) + "px";
+  updateSendState();
 }
-input.addEventListener("input", () => { autoGrow(); saveDraftSoon(); });
+input.addEventListener("input", () => { autoGrow(); saveDraftSoon(); updateSendState(); });
 input.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
   // Phone keyboards can emit Enter when confirming a paste. Keep the pasted text editable;
@@ -709,8 +750,18 @@ thread.addEventListener("click", (e) => {
 $("#pinnedStrip").addEventListener("click", (e) => {
   const toggle = e.target.closest(".pinned-toggle");
   const pin = e.target.closest(".btn-pin");
+  const jump = e.target.closest(".pinned-jump");
   if (toggle) { pinsExpanded = !pinsExpanded; renderPins(); }
-  else if (pin) setPinned(pin.dataset.id, false).catch(() => {});
+  else if (pin) {
+    e.stopPropagation();
+    setPinned(pin.dataset.id, false).catch(() => {});
+  }
+  else if (jump && jump.dataset.id) {
+    const target = document.querySelector(`.msg[data-id="${jump.dataset.id}"]`);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
 });
 function openLightbox(src, alt) {
   const lb = document.createElement("div");
@@ -757,9 +808,11 @@ wireCleanup();
 
 // ---- boot ----
 applyTheme();
+$("#connectBtn").classList.toggle("hidden", !isLocalhost);
 setConn(false);
 const savedDraft = localStorage.getItem(DRAFT_KEY);
 if (!input.value && savedDraft) { input.value = savedDraft; autoGrow(); }
+updateSendState();
 Promise.all([loadHistory(), loadPins()]).catch(() => {});
 refreshStorage().catch(() => {});
 connectWS();

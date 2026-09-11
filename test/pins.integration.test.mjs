@@ -29,8 +29,23 @@ async function api(pathname, options = {}) {
   return { response, body };
 }
 
+import fs from "node:fs";
+
 before(async () => {
-  server = spawn(process.execPath, ["--no-warnings", "server.js"], {
+  const hostExe = path.resolve(process.cwd(), "src/Ferry/Ferry.ServerHost/bin/Release/net10.0/Ferry.ServerHost.exe");
+  const hostDll = path.resolve(process.cwd(), "src/Ferry/Ferry.ServerHost/bin/Release/net10.0/Ferry.ServerHost.dll");
+  let cmd, args;
+  if (fs.existsSync(hostExe)) {
+    cmd = hostExe;
+    args = ["--port", String(port), "--data-dir", dataDir];
+  } else if (fs.existsSync(hostDll)) {
+    cmd = "dotnet";
+    args = [hostDll, "--port", String(port), "--data-dir", dataDir];
+  } else {
+    cmd = "dotnet";
+    args = ["run", "--project", "src/Ferry/Ferry.ServerHost", "-c", "Release", "--", "--port", String(port), "--data-dir", dataDir];
+  }
+  server = spawn(cmd, args, {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(port), FERRY_DATA_DIR: dataDir },
     stdio: ["ignore", "ignore", "pipe"],
