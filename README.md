@@ -18,19 +18,11 @@
 
 Ferry gives your own devices one shared thread on your local network. Drop in a note, photo, PDF, APK, or anything else, and it shows up on the other screen without signing in, uploading to a cloud drive, or hunting for a cable.
 
-It is deliberately small: a single C# executable hosting Kestrel in-process with a native WPF interface, one SQLite database, and files stored on your laptop.
+The laptop is the server; the phone is a browser tab. Ferry is deliberately small: one C# executable hosting Kestrel in-process behind a native WPF window, one SQLite database, and uploaded files sitting on your own disk.
 
-> **Personal beta:** Ferry covers the daily transfer basics, but it is an unsigned, LAN-only utility—not a hardened internet service. Use it only on a network you trust.
+> **Personal beta.** Ferry covers the daily transfer basics. It is an unsigned, LAN-only utility, not a hardened internet service. Use it only on a network you trust.
 
-## Why Ferry?
-
-- **Fast local handoff:** send text and files between phone and laptop on the same Wi-Fi.
-- **No account:** the laptop is the server; the phone is just a browser client.
-- **Persistent thread:** messages stay in a local SQLite database.
-- **Built for daily use:** QR connect, image previews, lightbox, light/dark/system themes, and storage cleanup.
-- **Desktop-aware:** files already on the laptop can be opened or revealed in Explorer.
-
-## How It Fits Together
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -47,7 +39,7 @@ The release is self-contained for 64-bit Windows. It does not need Node.js or a 
 
 Keep the `public` folder beside `Ferry.exe`; it contains the phone interface.
 
-## Build From Source
+## Build from source
 
 Requires the .NET 10 SDK. Node.js 24 or newer is needed only for the browser and protocol test suites.
 
@@ -56,11 +48,11 @@ dotnet build src/Ferry/Ferry.slnx -c Release
 dotnet run --project src/Ferry/Ferry -c Release
 ```
 
-Ferry opens its window with a local view and provides a pairing QR code for your phone. Scan the QR code from your phone to connect over LAN.
+Ferry opens its window and shows a pairing QR code. Scan it from the phone to connect over the LAN.
 
 By default Ferry listens on port `8787`. Set `FERRY_PORT` to override.
 
-## Windows Install
+## Windows install
 
 Ferry includes a source-install script for daily autostart:
 
@@ -68,7 +60,7 @@ Ferry includes a source-install script for daily autostart:
 npm run install:windows
 ```
 
-That builds the release executable, creates a Start menu shortcut named **Ferry**, and adds a per-user autostart entry. The app provides a system notification-area tray icon, handles notifications, and runs the server in-process.
+That builds the release executable, creates a Start menu shortcut named **Ferry**, and adds a per-user autostart entry. Ferry then runs from the notification area, serving in-process and raising a Windows notification when something arrives.
 
 To remove the Start menu shortcut and autostart entry:
 
@@ -89,7 +81,7 @@ npm run uninstall:windows
 
 Press `Ctrl+Alt+F` to bring Ferry to the front. The same action is available from its notification-area icon.
 
-## Project Layout
+## Project layout
 
 ```text
 src/Ferry/             WPF app, Kestrel server library, standalone host
@@ -100,13 +92,11 @@ public/vendor/         Offline QR generator
 data/                  Local runtime data, ignored by git
 ```
 
-## Security Scope
+## Security scope
 
-Ferry is for a trusted home network.
+Ferry is for a trusted home network, and its only boundary is a shared pairing token. Scan the QR code from the laptop once; the phone stores the token for later visits.
 
-Ferry uses a shared pairing token. Scan the QR code from the laptop once, and the phone stores the token for later visits.
-
-Do not expose Ferry to public Wi-Fi, the open internet, or a forwarded port. The token is meant to keep casual LAN access out, not to make Ferry safe as an internet-facing service.
+Do not expose Ferry to public Wi-Fi, the open internet, or a forwarded port. The token keeps casual LAN access out. It does not make Ferry safe as an internet-facing service.
 
 See [SECURITY.md](SECURITY.md) for the current security boundary and reporting guidance.
 
@@ -127,7 +117,7 @@ npm run conformance
 
 The conformance suite is the compatibility gate for the frozen browser/server protocol.
 
-## Current Limits
+## Current limits
 
 - Windows x64 host only; the phone side is a browser client.
 - Trusted local network only, over plain HTTP.
