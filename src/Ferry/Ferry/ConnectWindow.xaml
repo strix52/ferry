@@ -1,0 +1,52 @@
+<Window x:Class="Ferry.ConnectWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Pair a phone" Width="380" SizeToContent="Height"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Surface}" Foreground="{DynamicResource Ink}"
+        TextOptions.TextFormattingMode="Ideal"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13">
+    <Border Padding="20,16,20,20">
+        <StackPanel>
+            <!-- Header -->
+            <Grid Margin="0,0,0,12">
+                <TextBlock Text="Pair a phone"
+                           Style="{StaticResource TitleText}"
+                           VerticalAlignment="Center" />
+                <Button x:Name="CloseButton" Content="&#xE8BB;"
+                        Style="{StaticResource CloseCaptionButton}"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        ToolTip="Close" IsCancel="True" />
+            </Grid>
+
+            <TextBlock Text="Scan the QR code with your phone."
+                       Style="{StaticResource MetaText}"
+                       TextWrapping="Wrap" LineHeight="17" LineStackingStrategy="BlockLineHeight"
+                       Margin="0,0,0,16" />
+
+            <Border Background="#FFFFFF"
+                    CornerRadius="{StaticResource RadiusMd}"
+                    Padding="16"
+                    HorizontalAlignment="Center"
+                    Margin="0,0,0,16">
+                <Image x:Name="QrImage" Width="240" Height="240"
+                       RenderOptions.BitmapScalingMode="NearestNeighbor"
+                       HorizontalAlignment="Center" />
+            </Border>
+
+            <TextBox x:Name="UrlBox" IsReadOnly="True" Margin="0,0,0,12" />
+
+            <Button x:Name="CopyButton" Content="Copy link"
+                    Style="{StaticResource PrimaryButton}"
+                    HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+
+            <TextBlock x:Name="AltText" Style="{StaticResource MetaText}"
+                       TextWrapping="Wrap" LineHeight="16" LineStackingStrategy="BlockLineHeight"
+                       HorizontalAlignment="Center" TextAlignment="Center" />
+        </StackPanel>
+    </Border>
+</Window>

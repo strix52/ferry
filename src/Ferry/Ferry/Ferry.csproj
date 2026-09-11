@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- For the notification-area icon only (see TrayIcon.cs): WPF has no tray
+         control, and NotifyIcon is the supported way to get one. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\ferry.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Shell metadata: without these the exe shows up as "Ferry" with no
+       version, publisher or description in Explorer, Task Manager and the
+       taskbar tooltip. -->
+  <PropertyGroup>
+    <AssemblyTitle>Ferry</AssemblyTitle>
+    <Product>Ferry</Product>
+    <Description>Hand off text and files between this laptop and your phone.</Description>
+    <Company>Ferry</Company>
+    <Version>0.15.0</Version>
+    <FileVersion>0.15.0.0</FileVersion>
+    <AssemblyVersion>0.15.0.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <!-- Publish shape for the single-file self-contained build. ReadyToRun
+       front-loads JIT work so the window paints noticeably sooner on a cold
+       start; it only affects `dotnet publish`, not `dotnet build`. -->
+  <PropertyGroup>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <RuntimeIdentifier Condition="'$(PublishSingleFile)' == 'true'">win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ferry.Server\Ferry.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ferry.Tests" />
+  </ItemGroup>
+
+  <!-- The phone client is served from disk at runtime; without this the exe
+       starts, the API works, and GET / is a 404 that is invisible from the
+       laptop because the WPF client never asks for it. -->
+  <ItemGroup>
+    <Content Include="..\..\..\public\**\*" LinkBase="public" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- UseWindowsForms otherwise adds these to every file's global usings, and
+       they collide with WPF on names the rest of the app relies on:
+       Application, Clipboard, MessageBox, Image, Point, Color, Brushes.
+       TrayIcon.cs imports them explicitly instead. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+</Project>

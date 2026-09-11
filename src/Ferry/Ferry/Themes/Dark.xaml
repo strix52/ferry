@@ -1,0 +1,90 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+  <!--
+    Ferry "Passage" — dark.
+
+    Graphite and oxidized teal retain the same object-current hierarchy as light.
+    Every key here has an identically named custom property in
+    public/style.css, so the phone cannot drift away from the laptop. Add a
+    token in one place and you must add it in the other.
+
+    Aqua (Signal) is reserved strictly for live state — connected, attached,
+    transferring. Never spend it on decoration, or "live" stops meaning
+    anything.
+
+    Contrast against the ground each one is meant for: Ink 16.4:1, Dim 8.8:1,
+    Faint 5.8:1 (decorative only, never body text), Accent 9.7:1, AccentInk
+    on Accent 6.7:1.
+  -->
+
+  <!-- Colors first: DWM interop, gradients and animations need Color, not Brush. -->
+  <Color x:Key="BgColor">#101513</Color>
+  <Color x:Key="BgGlowColor">#1B2925</Color>
+  <Color x:Key="SurfaceColor">#17201E</Color>
+  <Color x:Key="Surface2Color">#1E2B27</Color>
+  <Color x:Key="Surface3Color">#263631</Color>
+  <Color x:Key="BorderColor">#2C3A35</Color>
+  <Color x:Key="BorderHiColor">#3E504A</Color>
+  <Color x:Key="InkColor">#ECF1EE</Color>
+  <Color x:Key="DimColor">#A8B4AF</Color>
+  <Color x:Key="FaintColor">#84918C</Color>
+  <Color x:Key="AccentColor">#6FC7BE</Color>
+  <Color x:Key="AccentHiColor">#9ADBD3</Color>
+  <Color x:Key="AccentInkColor">#082826</Color>
+  <Color x:Key="AccentSoftColor">#183B37</Color>
+  <Color x:Key="BubbleMineColor">#1D3531</Color>
+  <Color x:Key="SignalColor">#69D2A7</Color>
+  <Color x:Key="TransferColor">#D09ABA</Color>
+  <Color x:Key="TransferSoftColor">#3B2533</Color>
+  <Color x:Key="WarnColor">#E3B166</Color>
+  <Color x:Key="DangerColor">#F0808E</Color>
+
+  <SolidColorBrush x:Key="Bg" Color="{StaticResource BgColor}" />
+  <SolidColorBrush x:Key="BgGlow" Color="{StaticResource BgGlowColor}" />
+  <SolidColorBrush x:Key="Surface" Color="{StaticResource SurfaceColor}" />
+  <SolidColorBrush x:Key="Surface2" Color="{StaticResource Surface2Color}" />
+  <SolidColorBrush x:Key="Surface3" Color="{StaticResource Surface3Color}" />
+  <SolidColorBrush x:Key="Border" Color="{StaticResource BorderColor}" />
+  <SolidColorBrush x:Key="BorderHi" Color="{StaticResource BorderHiColor}" />
+  <SolidColorBrush x:Key="Ink" Color="{StaticResource InkColor}" />
+  <SolidColorBrush x:Key="Dim" Color="{StaticResource DimColor}" />
+  <SolidColorBrush x:Key="Faint" Color="{StaticResource FaintColor}" />
+  <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentColor}" />
+  <SolidColorBrush x:Key="AccentHi" Color="{StaticResource AccentHiColor}" />
+  <SolidColorBrush x:Key="AccentInk" Color="{StaticResource AccentInkColor}" />
+  <SolidColorBrush x:Key="AccentSoft" Color="{StaticResource AccentSoftColor}" />
+  <SolidColorBrush x:Key="BubbleMine" Color="{StaticResource BubbleMineColor}" />
+  <SolidColorBrush x:Key="Signal" Color="{StaticResource SignalColor}" />
+  <SolidColorBrush x:Key="Transfer" Color="{StaticResource TransferColor}" />
+  <SolidColorBrush x:Key="TransferSoft" Color="{StaticResource TransferSoftColor}" />
+  <SolidColorBrush x:Key="Warn" Color="{StaticResource WarnColor}" />
+  <SolidColorBrush x:Key="Danger" Color="{StaticResource DangerColor}" />
+
+  <!-- Hover/press washes: alpha over whatever is underneath, so one pair
+       works on every control no matter which surface it sits on. -->
+  <SolidColorBrush x:Key="Hover" Color="#14FFFFFF" />
+  <SolidColorBrush x:Key="Press" Color="#26FFFFFF" />
+  <SolidColorBrush x:Key="Selected" Color="#326FC7BE" />
+  <SolidColorBrush x:Key="DangerSoft" Color="#33F0808E" />
+
+  <!-- Mica shows through anything translucent, so the window ground is a thin
+       veil rather than an opaque fill. WindowEffects swaps this in only when
+       the backdrop actually took. -->
+  <SolidColorBrush x:Key="MicaVeil" Color="#BC101513" />
+
+  <SolidColorBrush x:Key="HeaderWash" Color="#17201E" />
+
+  <sys:Boolean x:Key="ThemeIsDark">True</sys:Boolean>
+
+  <!-- Legacy aliases. Kept so older XAML keeps resolving while the
+       control library lands; delete once nothing references them. -->
+  <SolidColorBrush x:Key="PageBg" Color="{StaticResource BgColor}" />
+  <SolidColorBrush x:Key="BubbleMineBg" Color="{StaticResource BubbleMineColor}" />
+  <SolidColorBrush x:Key="BubbleMineInk" Color="{StaticResource InkColor}" />
+  <SolidColorBrush x:Key="BubbleOtherBg" Color="{StaticResource Surface2Color}" />
+  <SolidColorBrush x:Key="BubbleOtherInk" Color="{StaticResource InkColor}" />
+  <SolidColorBrush x:Key="CardBorder" Color="{StaticResource BorderColor}" />
+  <SolidColorBrush x:Key="InputBg" Color="{StaticResource Surface2Color}" />
+  <SolidColorBrush x:Key="InputBorder" Color="{StaticResource BorderHiColor}" />
+</ResourceDictionary>

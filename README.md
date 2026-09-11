@@ -10,13 +10,17 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-7d5c84"></a>
-  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-24+-2f6f4e">
+  <img alt="Version 0.15.0 beta" src="https://img.shields.io/badge/version-0.15.0%20beta-0F5F5D">
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4">
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078D4">
   <img alt="LAN only" src="https://img.shields.io/badge/scope-LAN%20only-5b6470">
 </p>
 
 Ferry gives your own devices one shared thread on your local network. Drop in a note, photo, PDF, APK, or anything else, and it shows up on the other screen without signing in, uploading to a cloud drive, or hunting for a cable.
 
-It is deliberately small: one Node server, one browser UI, one SQLite database, and files stored on your laptop.
+It is deliberately small: a single C# executable hosting Kestrel in-process with a native WPF interface, one SQLite database, and files stored on your laptop.
+
+> **Personal beta:** Ferry covers the daily transfer basics, but it is an unsigned, LAN-only utility—not a hardened internet service. Use it only on a network you trust.
 
 ## Why Ferry?
 
@@ -30,44 +34,41 @@ It is deliberately small: one Node server, one browser UI, one SQLite database, 
 
 ```mermaid
 flowchart LR
-  Phone["Phone browser"] <-->|"HTTP + WebSocket"| Laptop["Laptop running Ferry"]
+  Phone["Phone browser"] <-->|"HTTP + WebSocket"| Laptop["Laptop running Ferry.exe"]
   Laptop --> DB[("SQLite message history")]
   Laptop --> Files["data/files uploads"]
 ```
 
-## Quick Start
+## Download
+
+Download `ferry-windows-x64-v0.15.0.zip` from [GitHub Releases](https://github.com/strix52/ferry/releases), verify its SHA-256 against the accompanying checksum file, and extract the whole archive before running `Ferry.exe`.
+
+The release is self-contained for 64-bit Windows. It does not need Node.js or a separately installed .NET runtime. Because the executable is not code-signed, Windows may show a reputation warning on first launch.
+
+Keep the `public` folder beside `Ferry.exe`; it contains the phone interface.
+
+## Build From Source
+
+Requires the .NET 10 SDK. Node.js 24 or newer is needed only for the browser and protocol test suites.
 
 ```powershell
-npm install
-npm start
+dotnet build src/Ferry/Ferry.slnx -c Release
+dotnet run --project src/Ferry/Ferry -c Release
 ```
 
-Ferry prints a laptop URL and a pairing URL for your phone. Open the laptop URL locally, then press **Connect** and scan the QR code from your phone.
+Ferry opens its window with a local view and provides a pairing QR code for your phone. Scan the QR code from your phone to connect over LAN.
 
-By default Ferry listens on port `8787`.
+By default Ferry listens on port `8787`. Set `FERRY_PORT` to override.
 
-```powershell
-$env:PORT=8790
-npm start
-```
+## Windows Install
 
-## Windows Helper
-
-Ferry includes a lightweight Windows helper for daily use:
+Ferry includes a source-install script for daily autostart:
 
 ```powershell
 npm run install:windows
 ```
 
-That creates a Start menu shortcut named **Ferry** and a per-user autostart entry. The helper keeps a notification-area icon alive, starts the server, opens Ferry in your default browser, copies the phone URL, and can restart or stop the server.
-
-The Windows tray helper is a tiny native WinForms executable built locally from source during install.
-
-You can also run it manually:
-
-```powershell
-npm run tray
-```
+That builds the release executable, creates a Start menu shortcut named **Ferry**, and adds a per-user autostart entry. The app provides a system notification-area tray icon, handles notifications, and runs the server in-process.
 
 To remove the Start menu shortcut and autostart entry:
 
@@ -86,10 +87,12 @@ npm run uninstall:windows
 | Appearance | Light, dark, and system theme modes. |
 | Storage | Show usage and clean up older uploaded files. |
 
+Press `Ctrl+Alt+F` to bring Ferry to the front. The same action is available from its notification-area icon.
+
 ## Project Layout
 
 ```text
-server.js              HTTP, WebSocket, upload, download, cleanup
+src/Ferry/             WPF app, Kestrel server library, standalone host
 public/index.html      App shell
 public/app.js          Client state and UI behavior
 public/style.css       Theme and layout
@@ -105,12 +108,31 @@ Ferry uses a shared pairing token. Scan the QR code from the laptop once, and th
 
 Do not expose Ferry to public Wi-Fi, the open internet, or a forwarded port. The token is meant to keep casual LAN access out, not to make Ferry safe as an internet-facing service.
 
+See [SECURITY.md](SECURITY.md) for the current security boundary and reporting guidance.
+
 ## Tech
 
-- Node.js with native `node:sqlite`
-- `ws` for live updates
-- Vanilla HTML, CSS, and JavaScript
+- .NET 10 (C#, WPF, ASP.NET Core Kestrel in-process)
+- `Microsoft.Data.Sqlite`
+- Vanilla HTML, CSS, and JavaScript for the phone client
 - Vendored `qrcode-generator` for offline QR codes
+
+## Verification
+
+```powershell
+dotnet test src/Ferry/Ferry.slnx -c Release
+npm test
+npm run conformance
+```
+
+The conformance suite is the compatibility gate for the frozen browser/server protocol.
+
+## Current Limits
+
+- Windows x64 host only; the phone side is a browser client.
+- Trusted local network only, over plain HTTP.
+- No code signing or automatic updater.
+- No accounts, cloud relay, folder sync, search, or multi-user permissions.
 
 ## Credits
 
