@@ -42,6 +42,10 @@ let lastReadId = Number(localStorage.getItem(READ_KEY) || 0);
 let draftTimer = null;
 let uploadQueue = [];
 let uploadRunning = false;
+let currentWs = null;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let hiddenSince = 0;
 
 // ---- helpers ----
 function fmtBytes(n) {
@@ -664,14 +668,55 @@ function renderPresence(list) {
     others.length > 1 ? `● ${others.length} attached` : "";
 }
 let wsFirstConnect = true;
+
+function reconnectDelay() {
+  const base = authToken ? 1000 : 5000;
+  const cap = 30000;
+  const ceiling = Math.min(cap, base * Math.pow(2, reconnectAttempts));
+  return Math.random() * ceiling;   // full jitter
+}
+
+function ensureConnected() {
+  if (document.visibilityState !== "visible") return;
+  const awayMs = hiddenSince ? Date.now() - hiddenSince : 0;
+  hiddenSince = 0;
+
+  const state = currentWs ? currentWs.readyState : WebSocket.CLOSED;
+  if (state === WebSocket.OPEN) {
+    if (awayMs > 60000) {
+      loadHistory().catch(() => {});
+      loadPins().catch(() => {});
+    }
+    return;
+  }
+  if (state === WebSocket.CONNECTING) return;
+
+  setConn(false);
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  connectWS();
+}
+
 function connectWS() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (currentWs && (currentWs.readyState === WebSocket.CONNECTING || currentWs.readyState === WebSocket.OPEN)) {
+    return;
+  }
+
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const qs = authQuery();
   const params = new URLSearchParams(qs);
   params.set("senderId", device.id);
   params.set("senderName", device.name);
   const ws = new WebSocket(`${proto}://${location.host}/ws?${params}`);
+  currentWs = ws;
   ws.onopen = () => {
+    reconnectAttempts = 0;
     setConn(true);
     // A fresh socket may have missed broadcasts while we were away
     // (background tab, Doze, WiFi roam): catch up instead of staying stale.
@@ -692,7 +737,12 @@ function connectWS() {
     else if (data.type === "presence") renderPresence(data.presence || []);
     else if (data.type === "auth") showAuthRequired();
   };
-  ws.onclose = () => { setConn(false); setTimeout(connectWS, authToken ? 1500 : 5000); };
+  ws.onclose = () => {
+    if (ws !== currentWs) return;
+    setConn(false);
+    reconnectAttempts++;
+    reconnectTimer = setTimeout(connectWS, reconnectDelay());
+  };
 }
 
 // ---- input UX ----
@@ -804,6 +854,14 @@ $("#settingsBackdrop").addEventListener("click", closeSettings);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { $("#connectModal").classList.add("hidden"); if ($("#settingsDrawer").classList.contains("open")) closeSettings(); }
 });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    hiddenSince = Date.now();
+    return;
+  }
+  ensureConnected();
+});
+window.addEventListener("pageshow", ensureConnected);
 wireCleanup();
 
 // ---- boot ----

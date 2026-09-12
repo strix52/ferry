@@ -1285,6 +1285,7 @@ public partial class MainWindow : Window
 
     private async Task WatchLoopAsync()
     {
+        var attempts = 0;
         while (!_cts.IsCancellationRequested)
         {
             try
@@ -1304,10 +1305,15 @@ public partial class MainWindow : Window
                     list => Dispatcher.InvokeAsync(() => RenderPresence(list)).Task,
                     stats => Dispatcher.InvokeAsync(() => _settingsWindow?.UpdateStorageUI(stats)).Task,
                     msg => Dispatcher.InvokeAsync(() => NotifyInboundMessage(msg)).Task);
+                attempts = 0;
             }
             catch (Exception) when (!_cts.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                attempts++;
+                var ceilingMs = Math.Min(30_000, 1_000 * (int)Math.Pow(2, Math.Min(attempts, 5)));
+                var delayMs = Random.Shared.Next(ceilingMs);
+                await Task.Delay(TimeSpan.FromMilliseconds(delayMs), _cts.Token)
+                          .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
         }
     }
