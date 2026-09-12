@@ -334,7 +334,10 @@ body {
 .msg:has(.card) .passage-spine span { background: var(--accent); box-shadow: 0 0 0 3px var(--bg); }
 
 /* pinned items */
-#pinnedStrip { max-width: 860px; margin: 10px auto 0; border-bottom: 1px solid var(--line); background: transparent; overflow: hidden; }
+/* width:100% matters: the strip is a direct flex child of body, and auto
+   cross-axis margins cancel stretch. Without it the box shrinks to its content,
+   so the collapsed toggle sat centred and the expanded list did not. */
+#pinnedStrip { width: 100%; max-width: 860px; margin: 10px auto 0; border-bottom: 1px solid var(--line); background: transparent; overflow: hidden; }
 .pinned-toggle { width: 100%; display: flex; align-items: center; gap: 7px; padding: 10px 12px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; text-align: start; }
 .pinned-toggle .ico { color: var(--accent); }
 .pinned-items { border-top: 1px solid var(--line); background: var(--elev-1); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }

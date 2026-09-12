@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace Ferry;
 
@@ -371,6 +372,10 @@ public partial class MainWindow : Window
     private TrayIcon? _tray;
     private bool _exiting;
     private bool _saidWhereItWent;
+    private readonly List<FerryMessage> _notifyBatch = [];
+    private DateTime _notifyBatchStarted;
+    private DispatcherTimer? _notifyTimer;
+    private bool _notifyTimerHooked;
 
     private const System.Windows.Input.ModifierKeys SummonMods =
         System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Alt;
@@ -523,14 +528,82 @@ public partial class MainWindow : Window
 
     private void SetUpNotifications() => ToastRegistration.Ensure();
 
+    // A phone sending twenty photos uploads them one at a time, so twenty
+    // separate messages arrive over half a minute. Collect them and toast once
+    // the arrivals stop, rather than once per file.
+    private static readonly TimeSpan NotifyQuietPeriod = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan NotifyMaxHold = TimeSpan.FromSeconds(15);
+
     private void NotifyInboundMessage(FerryMessage m)
     {
         // Fire only when the message is not ours and the window is not active
         if (m.SenderId == _device?.Id || IsActive) return;
 
-        var title = $"{m.DisplayName} on Ferry";
-        var content = m.IsText ? (m.Text ?? "") : (m.Filename ?? "sent a file");
+        if (_notifyBatch.Count == 0) _notifyBatchStarted = DateTime.UtcNow;
+        _notifyBatch.Add(m);
 
+        // A steady stream would otherwise defer the toast forever, so cap the
+        // hold and let a long burst report itself in instalments.
+        if (DateTime.UtcNow - _notifyBatchStarted >= NotifyMaxHold)
+        {
+            FlushNotifyBatch();
+            return;
+        }
+
+        _notifyTimer ??= new DispatcherTimer { Interval = NotifyQuietPeriod };
+        if (!_notifyTimerHooked)
+        {
+            _notifyTimer.Tick += (_, _) => FlushNotifyBatch();
+            _notifyTimerHooked = true;
+        }
+        _notifyTimer.Stop();
+        _notifyTimer.Start();
+    }
+
+    private void FlushNotifyBatch()
+    {
+        _notifyTimer?.Stop();
+        if (_notifyBatch.Count == 0) return;
+        var batch = _notifyBatch.ToList();
+        _notifyBatch.Clear();
+
+        // He may have opened Ferry while the batch was still filling.
+        if (IsActive) return;
+
+        var senders = batch.Select(x => x.DisplayName).Distinct().ToList();
+        var title = senders.Count == 1 ? $"{senders[0]} on Ferry" : "Ferry";
+
+        if (batch.Count == 1)
+        {
+            var only = batch[0];
+            ShowInboundToast(title, only.IsText ? (only.Text ?? "") : (only.Filename ?? "sent a file"), copyable: true);
+            return;
+        }
+        ShowInboundToast(title, SummarizeBatch(batch), copyable: false);
+    }
+
+    internal static string SummarizeBatch(IReadOnlyList<FerryMessage> batch)
+    {
+        var photos = batch.Count(x => x.IsImage);
+        var texts = batch.Count(x => x.IsText);
+        var files = batch.Count - photos - texts;
+
+        var parts = new List<string>();
+        if (photos > 0) parts.Add(photos == 1 ? "1 photo" : $"{photos} photos");
+        if (files > 0) parts.Add(files == 1 ? "1 file" : $"{files} files");
+        if (texts > 0) parts.Add(texts == 1 ? "1 message" : $"{texts} messages");
+
+        return parts.Count switch
+        {
+            0 => $"{batch.Count} items",
+            1 => parts[0],
+            2 => $"{parts[0]} and {parts[1]}",
+            _ => $"{string.Join(", ", parts.Take(parts.Count - 1))} and {parts[^1]}",
+        };
+    }
+
+    private void ShowInboundToast(string title, string content, bool copyable)
+    {
         // Windows drops a toast from an unregistered app id without raising
         // anything, so the choice has to be made before Show(), not in a catch.
         if (!ToastRegistration.Ready)
@@ -541,6 +614,9 @@ public partial class MainWindow : Window
 
         try
         {
+            var copyAction = copyable
+                ? $@"<action content=""Copy"" arguments=""action=copy&amp;content={System.Security.SecurityElement.Escape(content)}"" activationType=""background"" />"
+                : "";
             var xml = $@"
 <toast launch=""action=show"">
     <visual>
@@ -550,13 +626,19 @@ public partial class MainWindow : Window
         </binding>
     </visual>
     <actions>
-        <action content=""Copy"" arguments=""action=copy&amp;content={System.Security.SecurityElement.Escape(content)}"" activationType=""background"" />
+        {copyAction}
         <action content=""Show Ferry"" arguments=""action=show"" activationType=""foreground"" />
     </actions>
 </toast>";
             var doc = new Windows.Data.Xml.Dom.XmlDocument();
             doc.LoadXml(xml);
-            var toast = new Windows.UI.Notifications.ToastNotification(doc);
+            // Same tag and group, so a later arrival replaces the toast in
+            // Action Center instead of stacking another card on top of it.
+            var toast = new Windows.UI.Notifications.ToastNotification(doc)
+            {
+                Tag = "inbound",
+                Group = "ferry",
+            };
             toast.Activated += (t, args) =>
             {
                 Dispatcher.Invoke(() =>
