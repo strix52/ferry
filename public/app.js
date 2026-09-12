@@ -30,6 +30,7 @@ const input = $("#input");
 const sendBtn = $("#sendBtn");
 const fileInput = $("#fileInput");
 const folderInput = $("#folderInput");
+const photoInput = $("#photoInput");
 const scrollArea = $("#scrollableArea");
 
 let cachedMessages = [];   // for cleanup impact preview
@@ -867,6 +868,14 @@ if (attachBtn) {
   });
 }
 
+$("#photoBtn")?.addEventListener("click", () => {
+  hideAttachMenu();
+  photoInput?.click();
+});
+photoInput?.addEventListener("change", () => {
+  if (photoInput.files.length) uploadFiles([...photoInput.files]);
+  photoInput.value = "";
+});
 $("#folderBtn")?.addEventListener("click", () => {
   hideAttachMenu();
   folderInput?.click();
@@ -956,6 +965,33 @@ window.addEventListener("drop", (e) => {
   e.preventDefault();
   dropHint.classList.add("hidden");
   if (e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]);
+});
+
+// paste a screenshot or a copied file straight into the thread
+function pastedFileName(file, index) {
+  // Clipboard images all arrive named "image.png". Stamp them so a thread of
+  // screenshots stays tellable apart after download.
+  if (file.name && file.name !== "image.png") return file.name;
+  const d = new Date();
+  const p = (n, w = 2) => String(n).padStart(w, "0");
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const suffix = index > 0 ? `-${index + 1}` : "";
+  const dot = (file.name || "").lastIndexOf(".");
+  const extension = dot > 0 ? file.name.slice(dot) : "." + (file.type.split("/")[1] || "png");
+  return `pasted-${stamp}${suffix}${extension}`;
+}
+window.addEventListener("paste", (e) => {
+  const data = e.clipboardData;
+  if (!data) return;
+  const files = [...(data.files || [])];
+  // Apps like Excel put both text and a bitmap on the clipboard. Text wins —
+  // intercepting it would break ordinary pasting into the composer.
+  if (!files.length || data.getData("text/plain").trim()) return;
+  e.preventDefault();
+  uploadFiles(files.map((file, i) => new File([file], pastedFileName(file, i), {
+    type: file.type,
+    lastModified: file.lastModified,
+  })));
 });
 
 // connect modal controls

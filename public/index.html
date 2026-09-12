@@ -226,13 +226,18 @@
     <div class="composer-inner">
       <input class="hidden" id="fileInput" multiple type="file" />
       <input class="hidden" id="folderInput" multiple type="file" webkitdirectory />
+      <input class="hidden" id="photoInput" multiple type="file" accept="image/*" />
       <div class="attach-menu hidden" id="attachMenu">
+        <button type="button" class="attach-menu-item" id="photoBtn">
+          <svg class="ico ico-sm"><use href="#i-image"/></svg>
+          <span>Send photo</span>
+        </button>
         <button type="button" class="attach-menu-item" id="folderBtn">
           <svg class="ico ico-sm"><use href="#i-folder"/></svg>
           <span>Send folder</span>
         </button>
       </div>
-      <button class="icon-btn" id="attachBtn" title="Send file (hold for folder)" aria-label="Send file"><svg class="ico"><use href="#i-add"/></svg></button>
+      <button class="icon-btn" id="attachBtn" title="Send file (hold for photos or a folder)" aria-label="Send file"><svg class="ico"><use href="#i-add"/></svg></button>
       <div class="input-wrap">
         <textarea id="input" placeholder="Type a message..." rows="1" enterkeyhint="enter" aria-label="Message"></textarea>
       </div>
