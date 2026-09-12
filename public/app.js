@@ -29,6 +29,7 @@ const thread = $("#thread");
 const input = $("#input");
 const sendBtn = $("#sendBtn");
 const fileInput = $("#fileInput");
+const folderInput = $("#folderInput");
 const scrollArea = $("#scrollableArea");
 
 let cachedMessages = [];   // for cleanup impact preview
@@ -362,6 +363,10 @@ async function sendText() {
   autoGrow();
 }
 async function uploadFiles(files) {
+  if (!files.length) return;
+  if (files.length > 50) {
+    if (!window.confirm(`Send ${files.length} files?`)) return;
+  }
   enqueueFiles(files);
 }
 function renderUploadQueue() {
@@ -382,10 +387,11 @@ function renderUploadQueue() {
   }).join("");
 }
 function enqueueFiles(files) {
+  const bulk = files.length > 50;
   for (const file of files) uploadQueue.push({
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     file,
-    previewUrl: isThumbable(file.name) ? URL.createObjectURL(file) : "",
+    previewUrl: (!bulk && isThumbable(file.name)) ? URL.createObjectURL(file) : "",
     status: "waiting", progress: 0, error: "", xhr: null,
   });
   renderUploadQueue();
@@ -803,8 +809,84 @@ input.addEventListener("keydown", (e) => {
   sendText();
 });
 sendBtn.addEventListener("click", sendText);
-$("#attachBtn").addEventListener("click", () => fileInput.click());
-fileInput.addEventListener("change", () => { if (fileInput.files.length) uploadFiles([...fileInput.files]); fileInput.value = ""; });
+let attachPressTimer = null;
+let attachLongPressed = false;
+let attachStartX = 0;
+let attachStartY = 0;
+
+function showAttachMenu() {
+  $("#attachMenu")?.classList.remove("hidden");
+}
+
+function hideAttachMenu() {
+  $("#attachMenu")?.classList.add("hidden");
+}
+
+const attachBtn = $("#attachBtn");
+if (attachBtn) {
+  attachBtn.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    attachLongPressed = false;
+    attachStartX = e.clientX;
+    attachStartY = e.clientY;
+    clearTimeout(attachPressTimer);
+    attachPressTimer = setTimeout(() => {
+      attachLongPressed = true;
+      try { navigator.vibrate?.(35); } catch (_) {}
+      showAttachMenu();
+    }, 450);
+  });
+
+  const cancelPress = (e) => {
+    if (attachPressTimer && e && e.clientX !== undefined) {
+      const dx = Math.abs(e.clientX - attachStartX);
+      const dy = Math.abs(e.clientY - attachStartY);
+      if (dx > 10 || dy > 10) clearTimeout(attachPressTimer);
+    } else {
+      clearTimeout(attachPressTimer);
+    }
+  };
+
+  attachBtn.addEventListener("pointermove", cancelPress);
+  attachBtn.addEventListener("pointerup", () => clearTimeout(attachPressTimer));
+  attachBtn.addEventListener("pointercancel", () => clearTimeout(attachPressTimer));
+
+  attachBtn.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    clearTimeout(attachPressTimer);
+    showAttachMenu();
+  });
+
+  attachBtn.addEventListener("click", () => {
+    if (attachLongPressed) {
+      attachLongPressed = false;
+      return;
+    }
+    hideAttachMenu();
+    fileInput.click();
+  });
+}
+
+$("#folderBtn")?.addEventListener("click", () => {
+  hideAttachMenu();
+  folderInput?.click();
+});
+folderInput?.addEventListener("change", () => {
+  // A directory pick sweeps up dotfiles nobody chose one by one. Picking or
+  // dropping one directly is deliberate, so only the folder path skips them.
+  const picked = [...folderInput.files].filter((f) => !f.name.startsWith("."));
+  if (picked.length) uploadFiles(picked);
+  folderInput.value = "";
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length) uploadFiles([...fileInput.files]);
+  fileInput.value = "";
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#attachMenu") && !e.target.closest("#attachBtn")) {
+    hideAttachMenu();
+  }
+});
 scrollArea.addEventListener("scroll", markReadAtBottom);
 $("#uploadQueue").addEventListener("click", (e) => {
   const retry = e.target.closest(".queue-retry");
@@ -947,6 +1029,7 @@ document.addEventListener("keydown", (e) => {
     $("#connectModal").classList.add("hidden");
     if ($("#settingsDrawer").classList.contains("open")) closeSettings();
     if (!$("#filterBar").classList.contains("hidden")) closeFilter();
+    hideAttachMenu();
   } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
     e.preventDefault();
     openFilter();

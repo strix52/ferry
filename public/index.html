@@ -225,7 +225,14 @@
   <div id="composer">
     <div class="composer-inner">
       <input class="hidden" id="fileInput" multiple type="file" />
-      <button class="icon-btn" id="attachBtn" title="Send file" aria-label="Send file"><svg class="ico"><use href="#i-add"/></svg></button>
+      <input class="hidden" id="folderInput" multiple type="file" webkitdirectory />
+      <div class="attach-menu hidden" id="attachMenu">
+        <button type="button" class="attach-menu-item" id="folderBtn">
+          <svg class="ico ico-sm"><use href="#i-folder"/></svg>
+          <span>Send folder</span>
+        </button>
+      </div>
+      <button class="icon-btn" id="attachBtn" title="Send file (hold for folder)" aria-label="Send file"><svg class="ico"><use href="#i-add"/></svg></button>
       <div class="input-wrap">
         <textarea id="input" placeholder="Type a message..." rows="1" enterkeyhint="enter" aria-label="Message"></textarea>
       </div>
