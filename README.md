@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-7d5c84"></a>
-  <img alt="Version 0.15.0 beta" src="https://img.shields.io/badge/version-0.15.0%20beta-0F5F5D">
+  <img alt="Version 0.16.0 beta" src="https://img.shields.io/badge/version-0.16.0%20beta-0F5F5D">
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4">
   <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078D4">
   <img alt="LAN only" src="https://img.shields.io/badge/scope-LAN%20only-5b6470">
@@ -33,7 +33,7 @@ flowchart LR
 
 ## Download
 
-Download `ferry-windows-x64-v0.15.0.zip` from [GitHub Releases](https://github.com/strix52/ferry/releases), verify its SHA-256 against the accompanying checksum file, and extract the whole archive before running `Ferry.exe`.
+Download `ferry-windows-x64-v0.16.0.zip` from [GitHub Releases](https://github.com/strix52/ferry/releases), verify its SHA-256 against the accompanying checksum file, and extract the whole archive before running `Ferry.exe`.
 
 The release is self-contained for 64-bit Windows. It does not need Node.js or a separately installed .NET runtime. Because the executable is not code-signed, Windows may show a reputation warning on first launch.
 

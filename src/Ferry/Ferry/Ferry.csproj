@@ -20,9 +20,9 @@
     <Product>Ferry</Product>
     <Description>Hand off text and files between this laptop and your phone.</Description>
     <Company>Ferry</Company>
-    <Version>0.15.0</Version>
-    <FileVersion>0.15.0.0</FileVersion>
-    <AssemblyVersion>0.15.0.0</AssemblyVersion>
+    <Version>0.16.0</Version>
+    <FileVersion>0.16.0.0</FileVersion>
+    <AssemblyVersion>0.16.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <!-- Publish shape for the single-file self-contained build. ReadyToRun
