@@ -16,6 +16,11 @@
   <img alt="LAN only" src="https://img.shields.io/badge/scope-LAN%20only-5b6470">
 </p>
 
+<p align="center">
+  <img src="assets/ferry-windows.png" width="600" alt="Ferry on Windows showing one thread with a chart image, a note, and the composer">
+  <img src="assets/ferry-phone.png" width="192" alt="The same thread open in a phone browser">
+</p>
+
 Ferry gives your own devices one shared thread on your local network. Drop in a note, photo, PDF, APK, or anything else, and it shows up on the other screen without signing in, uploading to a cloud drive, or hunting for a cable.
 
 The laptop is the server; the phone is a browser tab. Ferry is deliberately small: one C# executable hosting Kestrel in-process behind a native WPF window, one SQLite database, and uploaded files sitting on your own disk.
