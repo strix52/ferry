@@ -44,6 +44,8 @@ public partial class MainWindow : Window
     private SettingsWindow? _settingsWindow;
     private Point _dragStartPoint;
     private FerryMessage? _dragCandidate;
+    private IReadOnlyList<FerryMessage> _allMessages = Array.Empty<FerryMessage>();
+    private string _filterTerm = string.Empty;
 
     public MainWindow() : this(null)
     {
@@ -140,6 +142,33 @@ public partial class MainWindow : Window
         ConnectButton.Click += (_, _) => new ConnectWindow { Owner = this }.ShowDialog();
         SettingsButton.Click += (_, _) => OpenSettings();
         PinnedToggle.Click += (_, _) => TogglePinned();
+        FilterBox.TextChanged += (_, _) =>
+        {
+            _filterTerm = FilterBox.Text;
+            ApplyThread(FilterMessages(_allMessages));
+        };
+        FilterBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                e.Handled = true;
+                HideFilter();
+            }
+        };
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.F &&
+                System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            {
+                e.Handled = true;
+                ShowFilter();
+            }
+            else if (e.Key == System.Windows.Input.Key.Escape && FilterBox.Visibility == Visibility.Visible)
+            {
+                e.Handled = true;
+                HideFilter();
+            }
+        };
         ThreadList.KeyDown += (_, e) =>
         {
             if (e.Key == System.Windows.Input.Key.C &&
@@ -575,6 +604,34 @@ public partial class MainWindow : Window
         _ = WatchLoopAsync();
     }
 
+    private void ShowFilter()
+    {
+        TitleAndStatusPanel.Visibility = Visibility.Collapsed;
+        FilterBox.Visibility = Visibility.Visible;
+        FilterBox.Focus();
+        FilterBox.SelectAll();
+    }
+
+    private void HideFilter()
+    {
+        FilterBox.Text = string.Empty;
+        FilterBox.Visibility = Visibility.Collapsed;
+        TitleAndStatusPanel.Visibility = Visibility.Visible;
+        _filterTerm = string.Empty;
+        ApplyThread(FilterMessages(_allMessages));
+        Composer.Focus();
+    }
+
+    private IReadOnlyList<FerryMessage> FilterMessages(IReadOnlyList<FerryMessage> messages)
+    {
+        if (string.IsNullOrWhiteSpace(_filterTerm)) return messages;
+        var term = _filterTerm.Trim();
+        return messages.Where(m =>
+            (m.Text != null && m.Text.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+            (m.Filename != null && m.Filename.Contains(term, StringComparison.OrdinalIgnoreCase))
+        ).ToList();
+    }
+
     private async Task RefreshAsync()
     {
         try
@@ -583,8 +640,10 @@ public partial class MainWindow : Window
             App.Log($"fetched {messages.Count} messages");
             var newestId = messages.Count > 0 ? messages[^1].Id : 0;
             ResetLastReadIfThreadRewound(newestId);
-            var stick = AtBottom();
-            ApplyThread(messages);
+            _allMessages = messages;
+            var isFiltering = !string.IsNullOrWhiteSpace(_filterTerm);
+            var stick = !isFiltering && AtBottom();
+            ApplyThread(FilterMessages(_allMessages));
             var msgCount = _thread.OfType<FerryMessage>().Count();
             if (DateTime.UtcNow >= _statusHoldUntil) StatusText.Text = "Ready";
             if (stick && ThreadList.Items.Count > 0)
@@ -804,6 +863,7 @@ public partial class MainWindow : Window
         var displayItems = new List<object>();
         string? currentDayKey = null;
         var unreadDividerPlaced = false;
+        var isFiltering = !string.IsNullOrWhiteSpace(_filterTerm);
 
         for (var idx = 0; idx < incoming.Count; idx++)
         {
@@ -817,7 +877,7 @@ public partial class MainWindow : Window
                 currentDayKey = dayKey;
             }
 
-            if (!unreadDividerPlaced && _lastReadId > 0 && m.Id > _lastReadId)
+            if (!isFiltering && !unreadDividerPlaced && _lastReadId > 0 && m.Id > _lastReadId)
             {
                 displayItems.Add(new ThreadSeparator("New since you were last here", IsUnreadDivider: true));
                 unreadDividerPlaced = true;
@@ -866,7 +926,7 @@ public partial class MainWindow : Window
                     // Items between i and foundIndex were removed upstream
                     while (i < foundIndex)
                     {
-                        if (_thread[i] is FerryMessage removedMsg)
+                        if (_thread[i] is FerryMessage removedMsg && !_allMessages.Any(m => m.Id == removedMsg.Id))
                         {
                             ThumbnailCache.Forget(removedMsg.Id);
                         }
@@ -890,7 +950,7 @@ public partial class MainWindow : Window
 
         while (_thread.Count > desired.Count)
         {
-            if (_thread[^1] is FerryMessage removedMsg)
+            if (_thread[^1] is FerryMessage removedMsg && !_allMessages.Any(m => m.Id == removedMsg.Id))
             {
                 ThumbnailCache.Forget(removedMsg.Id);
             }

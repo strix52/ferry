@@ -181,6 +181,41 @@ body {
 .header-actions { display: flex; align-items: center; gap: 8px; }
 #connectBtn .ico { color: var(--accent-2); }
 
+/* ===== header filter ===== */
+.filter-bar {
+  position: absolute;
+  inset: 0;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top);
+  background: var(--bar);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 50;
+}
+.filter-ico { color: var(--dim); flex: none; }
+.filter-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--elev-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.filter-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+.filter-input::placeholder {
+  color: var(--faint);
+}
+
 /* ===== connect (QR) modal ===== */
 #connectModal {
   position: fixed; inset: 0; z-index: 80;

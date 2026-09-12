@@ -46,6 +46,10 @@ let currentWs = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let hiddenSince = 0;
+let filterTerm = "";
+let filterDebounceTimer = null;
+let savedScrollTop = 0;
+let isFiltering = false;
 
 // ---- helpers ----
 function fmtBytes(n) {
@@ -125,6 +129,7 @@ function saveDraftSoon() {
 }
 function clearDraft() { clearTimeout(draftTimer); localStorage.removeItem(DRAFT_KEY); }
 function markReadAtBottom() {
+  if (filterTerm) return;
   if (!atBottom()) return;
   const latest = latestMessageId();
   if (latest <= lastReadId) return;
@@ -271,7 +276,29 @@ function lastDayKey() {
   const seps = thread.querySelectorAll(".day-sep");
   return seps.length ? seps[seps.length - 1].dataset.daykey : null;
 }
+function visibleMessages() {
+  if (!filterTerm) return cachedMessages;
+  const t = filterTerm.toLowerCase();
+  return cachedMessages.filter((m) =>
+    (m.text || "").toLowerCase().includes(t) ||
+    (m.filename || "").toLowerCase().includes(t));
+}
 function addMessage(m) {
+  const i = cachedMessages.findIndex((x) => x.id === m.id);
+  if (i >= 0) cachedMessages[i] = m; else cachedMessages.push(m);
+
+  if (filterTerm) {
+    const t = filterTerm.toLowerCase();
+    const matches = (m.text || "").toLowerCase().includes(t) || (m.filename || "").toLowerCase().includes(t);
+    if (!matches) {
+      renderUnread();
+      return;
+    }
+  }
+
+  const emptyEl = thread.querySelector(".empty");
+  if (emptyEl) emptyEl.remove();
+
   const existing = thread.querySelector(`.msg[data-id="${m.id}"]`);
   if (existing) { existing.replaceWith(buildNode(m, null)); }
   else {
@@ -280,16 +307,35 @@ function addMessage(m) {
     thread.appendChild(buildNode(m, lastMsgInfo()));
     if (stick) scrollDown();
   }
-  const i = cachedMessages.findIndex((x) => x.id === m.id);
-  if (i >= 0) cachedMessages[i] = m; else cachedMessages.push(m);
-  if (atBottom()) markReadAtBottom(); else renderUnread();
+  if (!filterTerm) {
+    if (atBottom()) markReadAtBottom(); else renderUnread();
+  } else {
+    renderUnread();
+  }
 }
-function renderEmpty() {
+function renderEmpty(text = "Nothing here yet", subtext = "Send a message or file.") {
   thread.innerHTML = `<div class="empty">
     <div class="ring">${icon("i-logo")}</div>
-    <h2>Nothing here yet</h2>
-    <p>Send a message or file.</p>
+    <h2>${escapeHtml(text)}</h2>
+    ${subtext ? `<p>${escapeHtml(subtext)}</p>` : ""}
   </div>`;
+}
+function renderThread(list) {
+  thread.innerHTML = "";
+  if (!list.length) {
+    if (filterTerm) renderEmpty("No matches.", "");
+    else renderEmpty();
+    return;
+  }
+  let prev = null, curDay = null, insertedNew = false;
+  for (const m of list) {
+    const dk = dateKey(m.createdAt);
+    if (dk !== curDay) { thread.appendChild(daySep(m.createdAt)); curDay = dk; prev = null; }
+    if (!filterTerm && !insertedNew && m.id > lastReadId) { thread.appendChild(newSep()); insertedNew = true; }
+    thread.appendChild(buildNode(m, prev));
+    prev = m;
+  }
+  renderUnread();
 }
 async function loadHistory() {
   const msgs = await apiJson("/api/messages");
@@ -297,18 +343,9 @@ async function loadHistory() {
   const latest = latestMessageId();
   if (lastReadId > latest) { lastReadId = 0; localStorage.setItem(READ_KEY, "0"); }
   if (!lastReadId && latest) { lastReadId = latest; localStorage.setItem(READ_KEY, String(latest)); }
-  thread.innerHTML = "";
-  if (!msgs.length) { renderEmpty(); return; }
-  let prev = null, curDay = null, insertedNew = false;
-  for (const m of msgs) {
-    const dk = dateKey(m.createdAt);
-    if (dk !== curDay) { thread.appendChild(daySep(m.createdAt)); curDay = dk; prev = null; }
-    if (!insertedNew && m.id > lastReadId) { thread.appendChild(newSep()); insertedNew = true; }
-    thread.appendChild(buildNode(m, prev));
-    prev = m;
-  }
-  renderUnread();
-  if (!insertedNew) scrollDown();
+  renderThread(visibleMessages());
+  const hasNew = !filterTerm && cachedMessages.some((m) => m.id > lastReadId);
+  if (!hasNew) scrollDown();
 }
 async function loadPins() { pinnedItems = await apiJson("/api/pins"); renderPins(); }
 
@@ -847,12 +884,73 @@ $("#copyUrl").addEventListener("click", (e) => copyText(connectFullUrl, e.curren
 $("#copyPairLink").addEventListener("click", (e) => copyPairLink(e.currentTarget).catch(() => showAuthRequired()));
 $("#rotateToken").addEventListener("click", () => rotateSharedToken().catch(() => showAuthRequired()));
 
+// filter controls
+function openFilter() {
+  const bar = $("#filterBar");
+  const input = $("#filterInput");
+  if (!bar || !input) return;
+  if (bar.classList.contains("hidden")) {
+    savedScrollTop = scrollArea.scrollTop;
+    bar.classList.remove("hidden");
+  }
+  input.focus();
+}
+
+function closeFilter() {
+  const bar = $("#filterBar");
+  const input = $("#filterInput");
+  if (!bar || !input) return;
+  bar.classList.add("hidden");
+  if (filterTerm || input.value) {
+    input.value = "";
+    filterTerm = "";
+    isFiltering = false;
+    renderThread(visibleMessages());
+    scrollArea.scrollTop = savedScrollTop;
+  }
+}
+
+function onFilterInput() {
+  clearTimeout(filterDebounceTimer);
+  filterDebounceTimer = setTimeout(() => {
+    const input = $("#filterInput");
+    const term = input ? input.value.trim() : "";
+    if (!isFiltering && term) {
+      savedScrollTop = scrollArea.scrollTop;
+      isFiltering = true;
+    }
+    filterTerm = term;
+    renderThread(visibleMessages());
+    if (!filterTerm && isFiltering) {
+      isFiltering = false;
+      scrollArea.scrollTop = savedScrollTop;
+    }
+  }, 120);
+}
+
+$("#filterBtn")?.addEventListener("click", openFilter);
+$("#closeFilter")?.addEventListener("click", closeFilter);
+$("#filterInput")?.addEventListener("input", onFilterInput);
+$("#filterInput")?.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeFilter();
+  }
+});
+
 // settings controls
 $("#settingsBtn").addEventListener("click", openSettings);
 $("#closeSettings").addEventListener("click", closeSettings);
 $("#settingsBackdrop").addEventListener("click", closeSettings);
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { $("#connectModal").classList.add("hidden"); if ($("#settingsDrawer").classList.contains("open")) closeSettings(); }
+  if (e.key === "Escape") {
+    $("#connectModal").classList.add("hidden");
+    if ($("#settingsDrawer").classList.contains("open")) closeSettings();
+    if (!$("#filterBar").classList.contains("hidden")) closeFilter();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+    e.preventDefault();
+    openFilter();
+  }
 });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {

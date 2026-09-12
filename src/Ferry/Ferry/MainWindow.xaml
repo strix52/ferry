@@ -258,15 +258,25 @@
                         </Canvas>
                     </Viewbox>
 
-                    <StackPanel Grid.Column="1" Margin="11,0,8,0" VerticalAlignment="Center">
-                        <TextBlock Text="Ferry" Style="{StaticResource TitleText}" />
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="StatusText" Style="{StaticResource MetaText}"
-                                       Text="Connecting…" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Name="PresenceText" Style="{StaticResource MetaText}"
-                                       Foreground="{DynamicResource Signal}" Margin="8,0,0,0" />
+                    <Grid Grid.Column="1" Margin="11,0,8,0" VerticalAlignment="Center">
+                        <StackPanel x:Name="TitleAndStatusPanel" VerticalAlignment="Center">
+                            <TextBlock Text="Ferry" Style="{StaticResource TitleText}" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="StatusText" Style="{StaticResource MetaText}"
+                                           Text="Connecting…" TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="PresenceText" Style="{StaticResource MetaText}"
+                                           Foreground="{DynamicResource Signal}" Margin="8,0,0,0" />
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
+                        <TextBox x:Name="FilterBox"
+                                 Visibility="Collapsed"
+                                 VerticalAlignment="Center"
+                                 Height="28"
+                                 Padding="8,4"
+                                 FontSize="12"
+                                 ToolTip="Filter messages (Esc to close)"
+                                 shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+                    </Grid>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
