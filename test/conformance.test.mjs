@@ -668,3 +668,109 @@ test("traversal out of the public directory is refused", async () => {
     assert.doesNotMatch(await response.text(), /DatabaseSync|createServer/, `${attempt} leaked source`);
   }
 });
+
+test("GET /api/download without Range returns 200 and Accept-Ranges: bytes", async () => {
+  const payload = Buffer.from("range request baseline payload for download testing");
+  const id = await upload("range-test.bin", payload);
+  const response = await fetch(`${base}/api/download/${id}`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("accept-ranges"), "bytes");
+  assert.equal(Number(response.headers.get("content-length")), payload.length);
+  assert.equal(Buffer.from(await response.arrayBuffer()).toString(), payload.toString());
+});
+
+test("GET /api/download with Range: bytes=0-99 returns 206 and first 100 bytes", async () => {
+  const payload = Buffer.alloc(256);
+  for (let i = 0; i < payload.length; i++) payload[i] = i % 256;
+  const id = await upload("bytes-0-99.bin", payload);
+
+  const response = await fetch(`${base}/api/download/${id}`, {
+    headers: { Range: "bytes=0-99" },
+  });
+  assert.equal(response.status, 206);
+  assert.equal(response.headers.get("accept-ranges"), "bytes");
+  assert.equal(response.headers.get("content-range"), `bytes 0-99/${payload.length}`);
+  assert.equal(Number(response.headers.get("content-length")), 100);
+  const data = Buffer.from(await response.arrayBuffer());
+  assert.equal(data.length, 100);
+  assert.deepEqual(data, payload.subarray(0, 100));
+});
+
+test("GET /api/download with Range: bytes=100- returns 206 to end of file", async () => {
+  const payload = Buffer.alloc(256);
+  for (let i = 0; i < payload.length; i++) payload[i] = i % 256;
+  const id = await upload("bytes-100-.bin", payload);
+
+  const response = await fetch(`${base}/api/download/${id}`, {
+    headers: { Range: "bytes=100-" },
+  });
+  assert.equal(response.status, 206);
+  assert.equal(response.headers.get("content-range"), `bytes 100-255/${payload.length}`);
+  assert.equal(Number(response.headers.get("content-length")), 156);
+  const data = Buffer.from(await response.arrayBuffer());
+  assert.equal(data.length, 156);
+  assert.deepEqual(data, payload.subarray(100));
+});
+
+test("GET /api/download with Range: bytes=-50 returns 206 for suffix range", async () => {
+  const payload = Buffer.alloc(256);
+  for (let i = 0; i < payload.length; i++) payload[i] = i % 256;
+  const id = await upload("bytes-suffix.bin", payload);
+
+  const response = await fetch(`${base}/api/download/${id}`, {
+    headers: { Range: "bytes=-50" },
+  });
+  assert.equal(response.status, 206);
+  assert.equal(response.headers.get("content-range"), `bytes 206-255/${payload.length}`);
+  assert.equal(Number(response.headers.get("content-length")), 50);
+  const data = Buffer.from(await response.arrayBuffer());
+  assert.equal(data.length, 50);
+  assert.deepEqual(data, payload.subarray(206));
+});
+
+test("GET /api/download with unsatisfiable Range returns 416", async () => {
+  const payload = Buffer.alloc(150, 42);
+  const id = await upload("unsatisfiable.bin", payload);
+
+  const response = await fetch(`${base}/api/download/${id}`, {
+    headers: { Range: `bytes=${payload.length}-` },
+  });
+  assert.equal(response.status, 416);
+  assert.equal(response.headers.get("content-range"), `bytes */${payload.length}`);
+});
+
+test("GET /api/download with multi-range falls through to 200 whole file", async () => {
+  const payload = Buffer.alloc(128, 99);
+  const id = await upload("multirange.bin", payload);
+
+  const response = await fetch(`${base}/api/download/${id}`, {
+    headers: { Range: "bytes=0-0,10-20" },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("accept-ranges"), "bytes");
+  assert.equal(Number(response.headers.get("content-length")), payload.length);
+  const data = Buffer.from(await response.arrayBuffer());
+  assert.deepEqual(data, payload);
+});
+
+test("concatenating complementary ranges reproduces the original file exactly", async () => {
+  const payload = Buffer.alloc(500);
+  for (let i = 0; i < payload.length; i++) payload[i] = (i * 7) % 256;
+  const id = await upload("split.bin", payload);
+
+  const r1 = await fetch(`${base}/api/download/${id}`, {
+    headers: { Range: "bytes=0-199" },
+  });
+  assert.equal(r1.status, 206);
+  const part1 = Buffer.from(await r1.arrayBuffer());
+
+  const r2 = await fetch(`${base}/api/download/${id}`, {
+    headers: { Range: "bytes=200-499" },
+  });
+  assert.equal(r2.status, 206);
+  const part2 = Buffer.from(await r2.arrayBuffer());
+
+  const combined = Buffer.concat([part1, part2]);
+  assert.deepEqual(combined, payload);
+});
+

@@ -248,6 +248,55 @@ public sealed class FerryEndpoints
                     return;
                 }
 
+                context.Response.Headers.AcceptRanges = "bytes";
+
+                var fileInfo = new FileInfo(filePath);
+                var length = fileInfo.Length;
+                var rangeHeader = context.Request.GetTypedHeaders().Range;
+
+                // Single satisfiable range only; anything else falls through to the 200 path.
+                if (length == row.Size && rangeHeader != null && rangeHeader.Unit == "bytes" && rangeHeader.Ranges.Count == 1)
+                {
+                    var range = rangeHeader.Ranges.Single();
+                    long from, to;
+
+                    if (range.From.HasValue)
+                    {
+                        from = range.From.Value;
+                        to = range.To ?? (length - 1);
+                    }
+                    else if (range.To.HasValue)
+                    {
+                        // suffix form: "bytes=-500" means the last 500 bytes
+                        var suffix = Math.Min(range.To.Value, length);
+                        from = length - suffix;
+                        to = length - 1;
+                    }
+                    else
+                    {
+                        from = 0;
+                        to = length - 1;
+                    }
+
+                    if (from > to || from >= length || length == 0)
+                    {
+                        context.Response.StatusCode = 416;
+                        context.Response.Headers.ContentRange = $"bytes */{length}";
+                        context.Response.ContentLength = 0;
+                        return;
+                    }
+
+                    if (to >= length) to = length - 1;
+
+                    context.Response.StatusCode = 206;
+                    context.Response.ContentType = "application/octet-stream";
+                    context.Response.Headers.ContentDisposition = $"attachment; filename=\"{Uri.EscapeDataString(row.Filename ?? "file")}\"";
+                    context.Response.Headers.ContentRange = $"bytes {from}-{to}/{length}";
+                    context.Response.ContentLength = to - from + 1;
+                    await context.Response.SendFileAsync(filePath, from, to - from + 1, context.RequestAborted);
+                    return;
+                }
+
                 context.Response.StatusCode = 200;
                 context.Response.ContentType = "application/octet-stream";
                 context.Response.Headers.ContentDisposition = $"attachment; filename=\"{Uri.EscapeDataString(row.Filename ?? "file")}\"";
