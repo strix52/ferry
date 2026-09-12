@@ -29,13 +29,8 @@ already existed; nothing adds a concept to learn.
 ### Server
 
 - `GET /api/download/:id` honours `Range`, so a large video seeks and resumes instead of
-  restarting. Additive amendment to `docs/adr/wire-contract.md` section 8; the conformance suite
-  gained six checks and lost none.
-
-### Repository
-
-- `docs/adr/wire-contract.md` carried a literal NUL byte, which made git treat the frozen
-  contract as a binary file. It now diffs as text.
+  restarting. Additive amendment to the wire contract; the conformance suite gained six checks
+  and lost none.
 
 ### Release status
 
