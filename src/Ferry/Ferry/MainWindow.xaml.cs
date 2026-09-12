@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<FerryMessage> _pinnedMessages = new();
     private bool _pinsExpanded;
     private SettingsWindow? _settingsWindow;
+    private MediaWindow? _mediaWindow;
     private Point _dragStartPoint;
     private FerryMessage? _dragCandidate;
     private IReadOnlyList<FerryMessage> _allMessages = Array.Empty<FerryMessage>();
@@ -142,6 +143,9 @@ public partial class MainWindow : Window
         SendButton.Click += async (_, _) => await SendAsync();
         ConnectButton.Click += (_, _) => new ConnectWindow { Owner = this }.ShowDialog();
         SettingsButton.Click += (_, _) => OpenSettings();
+        // The full thread, not the filtered view: the gallery is the way back
+        // to old pictures, so a filter left in the box must not hide them.
+        MediaButton.Click += (_, _) => OpenMedia();
         PinnedToggle.Click += (_, _) => TogglePinned();
         FilterBox.TextChanged += (_, _) =>
         {
@@ -790,6 +794,22 @@ public partial class MainWindow : Window
         };
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.ShowDialog();
+    }
+
+    private void OpenMedia()
+    {
+        if (_mediaWindow is { IsVisible: true })
+        {
+            _mediaWindow.Activate();
+            return;
+        }
+
+        // Modeless, so he can keep the grid beside the thread. It reads
+        // _allMessages through the closure rather than a snapshot, so reopening
+        // is never needed to see something that just arrived.
+        _mediaWindow = new MediaWindow(() => _allMessages, this, SaveAsAsync);
+        _mediaWindow.Closed += (_, _) => _mediaWindow = null;
+        _mediaWindow.Show();
     }
 
     private void TogglePinned()

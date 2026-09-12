@@ -284,6 +284,14 @@
                                 Style="{StaticResource QuietButton}"
                                 ToolTip="Pair a phone"
                                 Margin="0,0,6,0" />
+                        <Button x:Name="MediaButton" Style="{StaticResource IconButton}"
+                                ToolTip="Media" Width="32" Height="32" Margin="0,0,2,0">
+                            <Viewbox Width="16" Height="16">
+                                <Canvas Width="24" Height="24">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconImage}" />
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
                         <Button x:Name="SettingsButton" Style="{StaticResource IconButton}"
                                 ToolTip="Settings" Width="32" Height="32">
                             <Viewbox Width="16" Height="16">

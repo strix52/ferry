@@ -1,0 +1,79 @@
+<Window x:Class="Ferry.MediaWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Media" Width="880" Height="620" MinWidth="420" MinHeight="320"
+        WindowStyle="None" ResizeMode="CanResizeWithGrip" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Ink}"
+        TextOptions.TextFormattingMode="Ideal"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header. Doubles as the drag handle, since WindowStyle is None. -->
+        <Grid x:Name="HeaderBar" Grid.Row="0" Background="{DynamicResource HeaderWash}"
+              Margin="0" Height="52">
+            <Grid Margin="20,0,10,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Viewbox Width="17" Height="17" Margin="0,0,9,0">
+                        <Canvas Width="24" Height="24">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconImage}"
+                                  Stroke="{DynamicResource Accent}" />
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Media" Style="{StaticResource TitleText}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="CountText" Margin="10,0,0,0" VerticalAlignment="Center"
+                               Style="{StaticResource MetaText}" />
+                </StackPanel>
+                <Button x:Name="CloseButton" Content="&#xE8BB;"
+                        Style="{StaticResource CloseCaptionButton}"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        ToolTip="Close (Esc)" />
+            </Grid>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled" Padding="0">
+            <StackPanel Margin="14,14,14,20">
+                <TextBlock x:Name="EmptyText" Visibility="Collapsed"
+                           Margin="6,40,6,0" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource Dim}"
+                           Text="No photos yet. Images you send or receive show up here." />
+
+                <ItemsControl x:Name="Tiles">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="150" Height="150" Margin="4"
+                                    CornerRadius="{StaticResource RadiusMd}"
+                                    Background="{DynamicResource Surface2}"
+                                    BorderBrush="{DynamicResource Border}" BorderThickness="1"
+                                    ClipToBounds="True" Cursor="Hand"
+                                    ToolTip="{Binding Caption, Mode=OneWay}"
+                                    MouseLeftButtonUp="Tile_Click">
+                                <Image Source="{Binding Image, Mode=OneWay}"
+                                       Stretch="UniformToFill"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Button x:Name="LoadOlderButton" Visibility="Collapsed"
+                        Style="{StaticResource GhostButton}"
+                        HorizontalAlignment="Center" Margin="0,16,0,0"
+                        Content="Load older" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
