@@ -42,22 +42,7 @@ public partial class App : Application
         FerryEndpoint.ResolveFromEnvironment();
 
         var port = FerryEndpoint.Port;
-        var envDataDir = Environment.GetEnvironmentVariable("FERRY_DATA_DIR");
-        string dataDir;
-        if (!string.IsNullOrEmpty(envDataDir))
-        {
-            dataDir = Path.GetFullPath(envDataDir);
-        }
-        else
-        {
-            var cwdData = Path.Combine(Directory.GetCurrentDirectory(), "data");
-            var localAppDataFerryData = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ferry", "data");
-            var appData = Path.Combine(AppContext.BaseDirectory, "data");
-            dataDir = Directory.Exists(cwdData) ? cwdData
-                : (Directory.Exists(localAppDataFerryData) || !Directory.Exists(appData)) ? localAppDataFerryData
-                : appData;
-        }
+        var dataDir = FerryPaths.ResolveDataDirectory();
 
         var envPublicDir = Environment.GetEnvironmentVariable("FERRY_PUBLIC_DIR");
         string publicDir;
@@ -114,6 +99,17 @@ public partial class App : Application
             args.SetObserved();
         };
         base.OnStartup(e);
+    }
+
+    public bool TryGetLocalFilePath(int messageId, out string path)
+    {
+        path = "";
+        var database = _server?.Database;
+        if (database is null) return false;
+
+        var row = database.GetMessage(messageId);
+        return row is { Kind: "file", Deleted: false }
+            && FerryPaths.TryResolveStoredFile(database.FilesDir, row.StoredName, out path);
     }
 
     protected override void OnExit(ExitEventArgs e)

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Windows file rows now have **Copy path**, which copies the full local stored-file path for
+  scripts and desktop agents without exposing that path to the phone API.
+- PCs with a fixed `D:` drive now keep Ferry data under `D:\Ferry\data`, migrate the existing
+  LocalAppData store on first launch, and start Save As in `D:\Ferry\Downloads`.
+
 ## 0.16.0 — Crossing
 
 Reliability and reach. Everything here removes a gesture or a failure mode in a flow that

@@ -22,6 +22,9 @@
     <None Include="..\Ferry\ImageWindow.xaml"
           Link="Fixtures\ImageWindow.xaml"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Ferry\MainWindow.xaml"
+          Link="Fixtures\MainWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Ferry\Themes\Controls.xaml"
           Link="Fixtures\Controls.xaml"
           CopyToOutputDirectory="PreserveNewest" />

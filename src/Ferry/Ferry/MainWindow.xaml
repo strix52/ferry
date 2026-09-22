@@ -133,6 +133,10 @@
                                 <Button Content="Save as" Tag="save"
                                         Style="{StaticResource QuietButton}"
                                         Click="FileAction_Click" IsEnabled="{Binding CanAct, Mode=OneWay}" />
+                                <Button Content="Copy path" Tag="copy-path"
+                                        Style="{StaticResource QuietButton}"
+                                        Click="FileAction_Click" IsEnabled="{Binding CanAct, Mode=OneWay}"
+                                        ToolTip="Copy full local path" />
                             </StackPanel>
                         </StackPanel>
                         <Button x:Name="CopyBtn" Style="{StaticResource IconButton}"

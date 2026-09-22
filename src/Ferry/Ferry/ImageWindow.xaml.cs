@@ -363,7 +363,11 @@ public partial class ImageWindow : Window
         }
         else
         {
-            var dialog = new Microsoft.Win32.SaveFileDialog { FileName = item.Filename ?? "image.png" };
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = item.Filename ?? "image.png",
+                InitialDirectory = FerryPaths.EnsureDownloadDirectory(),
+            };
             if (dialog.ShowDialog() == true && _currentBitmap != null)
             {
                 var encoder = new PngBitmapEncoder();

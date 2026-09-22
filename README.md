@@ -51,6 +51,11 @@ To remove the Start menu shortcut and autostart entry:
 npm run uninstall:windows
 ```
 
+On a PC with a ready fixed `D:` drive, Ferry keeps its database and received files in
+`D:\Ferry\data`, and Save As starts in `D:\Ferry\Downloads`. An existing LocalAppData
+store is migrated on the first launch. PCs without `D:` continue using the per-user
+LocalAppData store and the user's Downloads folder. `FERRY_DATA_DIR` still overrides both.
+
 ## Features
 
 | Area | What Ferry does |

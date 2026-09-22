@@ -1140,6 +1140,9 @@ public partial class MainWindow : Window
                 case "save":
                     await SaveAsAsync(m);
                     break;
+                case "copy-path":
+                    CopyLocalPath(m);
+                    break;
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
@@ -1150,7 +1153,11 @@ public partial class MainWindow : Window
 
     private async Task SaveAsAsync(FerryMessage m)
     {
-        var dialog = new Microsoft.Win32.SaveFileDialog { FileName = m.Filename ?? "file" };
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = m.Filename ?? "file",
+            InitialDirectory = FerryPaths.EnsureDownloadDirectory(),
+        };
         if (dialog.ShowDialog() != true) return;
         _failedUpload = null;
         _failedSave = null;
@@ -1177,6 +1184,17 @@ public partial class MainWindow : Window
             RetryButton.Visibility = Visibility.Visible;
         }
         finally { EndTransfer(transferCts); }
+    }
+
+    private void CopyLocalPath(FerryMessage message)
+    {
+        if (Application.Current is App app && app.TryGetLocalFilePath(message.Id, out var path))
+        {
+            if (TrySetClipboardText(path)) FlashStatus("Path copied.");
+            return;
+        }
+
+        FlashStatus("File unavailable.");
     }
 
     private async Task PickAndUploadAsync()

@@ -36,4 +36,17 @@ public class MainWindowVisualContractTests
             padding.Top + padding.Bottom <= 8,
             $"Composer vertical padding {padding.Top + padding.Bottom} makes the empty editor taller than its 44-DIP controls.");
     }
+
+    [Fact]
+    public void FileRows_ExposeAnExplicitCopyPathAction()
+    {
+        var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MainWindow.xaml");
+        var document = XDocument.Load(fixture);
+        var copyPath = document
+            .Descendants(Presentation + "Button")
+            .Single(element => (string?)element.Attribute("Tag") == "copy-path");
+
+        Assert.Equal("Copy path", (string?)copyPath.Attribute("Content"));
+        Assert.Equal("FileAction_Click", (string?)copyPath.Attribute("Click"));
+    }
 }
