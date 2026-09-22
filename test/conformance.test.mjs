@@ -26,7 +26,6 @@
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import { mkdtemp, rm, readdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -114,20 +113,12 @@ before(async () => {
     return;
   }
   dataDir = await mkdtemp(path.join(os.tmpdir(), "ferry-conformance-"));
-  const hostExe = path.resolve(process.cwd(), "src/Ferry/Ferry.ServerHost/bin/Release/net10.0/Ferry.ServerHost.exe");
-  const hostDll = path.resolve(process.cwd(), "src/Ferry/Ferry.ServerHost/bin/Release/net10.0/Ferry.ServerHost.dll");
-  let cmd, args;
-  if (fs.existsSync(hostExe)) {
-    cmd = hostExe;
-    args = ["--port", String(port), "--data-dir", dataDir];
-  } else if (fs.existsSync(hostDll)) {
-    cmd = "dotnet";
-    args = [hostDll, "--port", String(port), "--data-dir", dataDir];
-  } else {
-    cmd = "dotnet";
-    args = ["run", "--project", "src/Ferry/Ferry.ServerHost", "-c", "Release", "--", "--port", String(port), "--data-dir", dataDir];
-  }
-  server = spawn(cmd, args, {
+  // Always ask dotnet to build the host. Preferring an existing binary made
+  // protocol changes look broken whenever that output happened to be stale.
+  server = spawn("dotnet", [
+    "run", "--project", "src/Ferry/Ferry.ServerHost", "-c", "Release", "--",
+    "--port", String(port), "--data-dir", dataDir,
+  ], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(port), FERRY_DATA_DIR: dataDir },
     stdio: ["ignore", "ignore", "pipe"],
@@ -542,6 +533,21 @@ test("cleanup leaves text messages alone", async () => {
 });
 
 // ---- websocket ----
+
+test("GET /api/presence exposes the current deduplicated presence snapshot", async () => {
+  const first = await openSocket("presence-api", "Phone");
+  const second = await openSocket("presence-api", "Phone");
+  try {
+    await second.waitFor("presence");
+    const { body, status } = await api("/api/presence");
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.presence));
+    assert.equal(body.presence.filter((p) => p.id === "presence-api" && p.name === "Phone").length, 1);
+  } finally {
+    await second.close();
+    await first.close();
+  }
+});
 
 test("a websocket client is announced to everyone through presence", async () => {
   const watcher = await openSocket("watcher-a", "Watcher A");

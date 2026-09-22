@@ -6,6 +6,11 @@
   scripts and desktop agents without exposing that path to the phone API.
 - PCs with a fixed `D:` drive now keep Ferry data under `D:\Ferry\data`, migrate the existing
   LocalAppData store on first launch, and start Save As in `D:\Ferry\Downloads`.
+- Added the `ferryctl` agent command for connection status, guarded text and file sends, compact
+  recent-item previews, focused full-text reads, and pulling a chosen or latest file without
+  opening the UI.
+- Added authenticated `GET /api/presence`, an additive one-shot view of the existing WebSocket
+  presence list for local automation.
 
 ## 0.16.0 — Crossing
 

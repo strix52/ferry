@@ -1,5 +1,7 @@
 <Solution>
   <Project Path="Ferry/Ferry.csproj" />
+  <Project Path="Ferry.Cli/Ferry.Cli.csproj" />
+  <Project Path="Ferry.Cli.Tests/Ferry.Cli.Tests.csproj" />
   <Project Path="Ferry.Server/Ferry.Server.csproj" />
   <Project Path="Ferry.ServerHost/Ferry.ServerHost.csproj" />
   <Project Path="Ferry.Server.Tests/Ferry.Server.Tests.csproj" />

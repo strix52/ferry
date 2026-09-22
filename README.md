@@ -67,6 +67,30 @@ LocalAppData store and the user's Downloads folder. `FERRY_DATA_DIR` still overr
 | Appearance | Light, dark, and system theme modes. |
 | Storage | Show usage and clean up older uploaded files. |
 
+## Agent command
+
+The Windows installer also adds `ferryctl`, a compact JSON command for local coding agents and scripts:
+
+```powershell
+ferryctl status
+ferryctl send-text "Build finished"
+ferryctl send-file D:\path\report.pdf
+ferryctl recent --limit 5
+ferryctl read latest
+ferryctl pull latest
+ferryctl pull 42 --to D:\Ferry\Downloads
+```
+
+`send-text` and `send-file` first verify that another Ferry device is connected. If the phone is
+not present, they return `phone_not_connected` instead of leaving an item in the thread and tell
+the caller to open Ferry on the phone. `pull` saves into `D:\Ferry\Downloads` by default on PCs
+with a ready fixed `D:` drive, using a collision-safe filename.
+
+`recent` keeps text previews to 200 characters; use `read` only when the full note is needed.
+Every result is a single JSON line. Exit code `0` means success; `2` is command usage, `3` means
+Ferry is not running, `4` means the phone is not connected, and `5` means a requested file was
+not found or could not be read.
+
 Press `Ctrl+Alt+F` to bring Ferry to the front. The same action is available from its notification-area icon.
 
 ## Security scope
@@ -117,7 +141,7 @@ By default Ferry listens on port `8787`. Set `FERRY_PORT` to override.
 ## Project layout
 
 ```text
-src/Ferry/             WPF app, Kestrel server library, standalone host
+src/Ferry/             WPF app, agent CLI, Kestrel server library, standalone host
 public/index.html      App shell
 public/app.js          Client state and UI behavior
 public/style.css       Theme and layout

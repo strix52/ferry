@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $AppDir = Join-Path $env:LOCALAPPDATA "Ferry\app"
 $InstalledExe = Join-Path $AppDir "Ferry.exe"
+$CliShim = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\ferryctl.cmd"
 $StartMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $StartupDir = Join-Path $StartMenuDir "Startup"
 $StartMenuShortcut = Join-Path $StartMenuDir "Ferry.lnk"
@@ -17,6 +18,7 @@ Remove-Item -LiteralPath $StartMenuShortcut -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $WpfShortcut -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $StartupShortcut -Force -ErrorAction SilentlyContinue
 Remove-ItemProperty -Path $RunKey -Name "Ferry" -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $CliShim -Force -ErrorAction SilentlyContinue
 
 # Stop running Ferry processes
 Get-Process -Name "Ferry" -ErrorAction SilentlyContinue |
@@ -35,4 +37,4 @@ if ($isAdmin) {
   Write-Host "Get-NetFirewallRule -DisplayName `"Ferry`" | Where-Object { (`$_ | Get-NetFirewallApplicationFilter).Program -eq `"$InstalledExe`" } | Remove-NetFirewallRule"
 }
 
-Write-Host "Removed Ferry Start menu shortcuts and autostart entry."
+Write-Host "Removed Ferry shortcuts, agent command, and autostart entry."

@@ -92,6 +92,13 @@ public sealed class FerryEndpoints
                 return;
             }
 
+            if (method == "GET" && path == "/api/presence")
+            {
+                if (!RequireAuth(context)) return;
+                await SendJsonAsync(context, 200, new { presence = _hub.GetPresenceList() });
+                return;
+            }
+
             if (method == "POST" && path == "/api/messages")
             {
                 if (!RequireAuth(context)) return;
