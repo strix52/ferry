@@ -34,11 +34,13 @@ public partial class App : Application
     }
 
     public static string? StartupWarning { get; private set; }
+    public static bool StartInTray { get; private set; }
     private Ferry.Server.FerryServerInstance? _server;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         Log("startup");
+        StartInTray = e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase);
         FerryEndpoint.ResolveFromEnvironment();
 
         var port = FerryEndpoint.Port;

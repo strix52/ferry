@@ -43,7 +43,7 @@ Ferry includes a source-install script for daily autostart:
 npm run install:windows
 ```
 
-That builds the release executable, creates a Start menu shortcut named **Ferry**, and adds a per-user autostart entry. Ferry then runs from the notification area, serving in-process and raising a Windows notification when something arrives.
+That builds the release executable, creates a Start menu shortcut named **Ferry**, and adds a per-user autostart entry. Windows startup opens Ferry in the notification area; launching it from the Start menu opens the window. Ferry continues serving in-process and raises a Windows notification when something arrives.
 
 To remove the Start menu shortcut and autostart entry:
 
@@ -91,7 +91,7 @@ Every result is a single JSON line. Exit code `0` means success; `2` is command 
 Ferry is not running, `4` means the phone is not connected, and `5` means a requested file was
 not found or could not be read.
 
-Press `Ctrl+Alt+F` to bring Ferry to the front. The same action is available from its notification-area icon.
+Press `Ctrl+Alt+F` to bring Ferry to the front. The notification-area menu can also show Ferry or open a compact pairing QR window without opening the main window.
 
 ## Security scope
 

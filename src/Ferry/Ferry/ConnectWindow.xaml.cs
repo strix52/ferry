@@ -9,9 +9,19 @@ public partial class ConnectWindow : Window
 {
     private string _pairingUrl = "";
 
-    public ConnectWindow()
+    public ConnectWindow(bool nearTray = false)
     {
         InitializeComponent();
+        if (nearTray)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Loaded += (_, _) =>
+            {
+                var area = SystemParameters.WorkArea;
+                Left = area.Right - ActualWidth - 16;
+                Top = area.Bottom - ActualHeight - 16;
+            };
+        }
         SourceInitialized += (_, _) => WindowEffects.Apply(this, App.IsDark);
         Loaded += async (_, _) => await LoadAsync();
         CloseButton.Click += (_, _) => Close();

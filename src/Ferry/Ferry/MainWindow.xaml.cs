@@ -67,6 +67,17 @@ public partial class MainWindow : Window
         _enableChromeEffects = options.EnableChromeEffects;
 
         InitializeComponent();
+        if (App.StartInTray)
+        {
+            WindowState = WindowState.Minimized;
+            ShowInTaskbar = false;
+            Loaded += (_, _) =>
+            {
+                if (_tray is { Ok: true }) Hide();
+                else ShowInTaskbar = true;
+                WindowState = WindowState.Normal;
+            };
+        }
 
         if (_enableDraftPersistence)
         {
@@ -374,6 +385,7 @@ public partial class MainWindow : Window
 
     private HotkeyManager? _hotkeys;
     private TrayIcon? _tray;
+    private ConnectWindow? _trayConnectWindow;
     private bool _exiting;
     private bool _saidWhereItWent;
     private readonly List<FerryMessage> _notifyBatch = [];
@@ -389,7 +401,7 @@ public partial class MainWindow : Window
 
     private void SetUpTrayAndHotkeys()
     {
-        _tray = new TrayIcon("Ferry", Summon, () => _ = SendClipboardAsync(), ExitApp);
+        _tray = new TrayIcon("Ferry", Summon, ShowTrayQr, () => _ = SendClipboardAsync(), ExitApp);
         if (_tray.Ok)
             CloseButton.ToolTip =
                 $"Hide · {HotkeyManager.Describe(SummonMods, HotkeyKey)} to restore";
@@ -417,6 +429,7 @@ public partial class MainWindow : Window
             Close();
             return;
         }
+        ShowInTaskbar = true;
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
@@ -426,6 +439,21 @@ public partial class MainWindow : Window
         Topmost = true;
         Topmost = false;
         Composer.Focus();
+    }
+
+    private void ShowTrayQr()
+    {
+        if (_trayConnectWindow is { IsVisible: true } existing)
+        {
+            existing.Activate();
+            return;
+        }
+
+        var window = new ConnectWindow(nearTray: true);
+        _trayConnectWindow = window;
+        window.Closed += (_, _) => _trayConnectWindow = null;
+        window.Show();
+        window.Activate();
     }
 
     // Ctrl+Alt+Shift+F: whatever is on the clipboard goes to the phone without
@@ -509,6 +537,7 @@ public partial class MainWindow : Window
     private void ExitApp()
     {
         _exiting = true;
+        _trayConnectWindow?.Close();
         Close();
     }
 

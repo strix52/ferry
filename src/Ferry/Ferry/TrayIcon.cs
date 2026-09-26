@@ -16,12 +16,13 @@ internal sealed class TrayIcon : IDisposable
 
     public bool Ok => _icon is not null;
 
-    public TrayIcon(string tooltip, Action onShow, Action onSendClipboard, Action onExit)
+    public TrayIcon(string tooltip, Action onShow, Action onShowQr, Action onSendClipboard, Action onExit)
     {
         try
         {
             var menu = new ContextMenuStrip();
             menu.Items.Add("Show Ferry", null, (_, _) => onShow());
+            menu.Items.Add("Show QR", null, (_, _) => onShowQr());
             menu.Items.Add("Send clipboard", null, (_, _) => onSendClipboard());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Exit", null, (_, _) => onExit());

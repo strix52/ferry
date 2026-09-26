@@ -72,7 +72,7 @@ try {
   $shortcut.Save()
 
   # Configure HKCU Run autostart (replacing F5)
-  $launchCommand = "`"$InstalledExe`""
+  $launchCommand = "`"$InstalledExe`" --minimized"
   Set-ItemProperty -Path $RunKey -Name "Ferry" -Value $launchCommand
 
   # Firewall rule (F7)
