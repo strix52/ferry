@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.17.0 — Prepared for release
+## 0.17.0
 
 - Windows file rows now have **Copy path**, which copies the full local stored-file path for
   scripts and desktop agents without exposing that path to the phone API.
