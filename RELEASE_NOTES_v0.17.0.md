@@ -1,4 +1,4 @@
-# Ferry v0.17.0 — Release draft
+# Ferry v0.17.0
 
 Ferry 0.17.0 adds a local command line tool and makes tray startup the default on Windows. It also changes where data lives on PCs with a ready fixed `D:` drive.
 
