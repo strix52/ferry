@@ -91,7 +91,7 @@ Every result is a single JSON line. Exit code `0` means success; `2` is command 
 Ferry is not running, `4` means the phone is not connected, and `5` means a requested file was
 not found or could not be read.
 
-Press `Ctrl+Alt+F` to bring Ferry to the front. The notification-area menu can also show Ferry or open a compact pairing QR window without opening the main window. The QR window closes automatically after 60 seconds.
+Press `Ctrl+Alt+F` to bring Ferry to the front. The notification-area menu can also show Ferry or open a compact pairing QR window without opening the main window. The QR window closes automatically after 30 seconds.
 
 ## Security scope
 

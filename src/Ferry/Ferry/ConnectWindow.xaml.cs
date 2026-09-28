@@ -16,7 +16,7 @@ public partial class ConnectWindow : Window
         InitializeComponent();
         if (nearTray)
         {
-            _trayTimeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+            _trayTimeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
             _trayTimeout.Tick += (_, _) => Close();
             Loaded += (_, _) => _trayTimeout.Start();
             Closed += (_, _) => _trayTimeout.Stop();
