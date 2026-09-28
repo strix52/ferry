@@ -4,7 +4,7 @@ Ferry 0.17.0 adds a local command line tool and makes tray startup the default o
 
 ## Changes
 
-- `ferryctl.exe` ships in the Windows ZIP. From the extracted folder, use `ferryctl status`, `send-text`, `send-file`, `recent`, `read`, and `pull`. The source installer also adds a `ferryctl` command to your path. Sends require another Ferry device to be connected; the command returns `phone_not_connected` if none is present. Results are one JSON line, with errors on stderr. Interrupted pulls leave no partial download.
+- `ferryctl.exe` ships in the Windows ZIP. From the extracted folder, run `.\ferryctl.exe status`; the same command supports `send-text`, `send-file`, `recent`, `read`, and `pull`. The source installer also adds `ferryctl` to your path. Sends require another Ferry device to be connected and return `phone_not_connected` if none is present. Results are one JSON line, with errors on stderr. Interrupted pulls leave no partial download.
 - A ready fixed `D:` drive becomes the default home for Ferry's database and received files at `D:\Ferry\data`. On first launch, Ferry copies an existing LocalAppData store, verifies the copied files, then switches to the new location. Portable `data` folders and `FERRY_DATA_DIR` overrides keep their current precedence. Save As starts in `D:\Ferry\Downloads` on those PCs.
 - Windows file rows have **Copy path** for the local stored file.
 - Ferry starts in the tray, including when Windows launches the EXE without arguments. Use the tray's **Show Ferry** item or `Ferry.exe --show-window` to open the main window. **Show QR** opens the pairing code in a small window that closes after 30 seconds.
