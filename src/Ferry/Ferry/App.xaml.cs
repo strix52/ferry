@@ -35,12 +35,15 @@ public partial class App : Application
 
     public static string? StartupWarning { get; private set; }
     public static bool StartInTray { get; private set; }
+    internal static bool ShouldStartInTray(IEnumerable<string> args) =>
+        !args.Contains("--show-window", StringComparer.OrdinalIgnoreCase);
     private Ferry.Server.FerryServerInstance? _server;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         Log("startup");
-        StartInTray = e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase);
+        StartInTray = ShouldStartInTray(e.Args);
+        Log(StartInTray ? "startup in tray" : "startup window");
         FerryEndpoint.ResolveFromEnvironment();
 
         var port = FerryEndpoint.Port;
@@ -101,6 +104,19 @@ public partial class App : Application
             args.SetObserved();
         };
         base.OnStartup(e);
+        var window = new MainWindow();
+        MainWindow = window;
+        if (StartInTray)
+        {
+            // Create the HWND (and tray icon) without ever showing the window.
+            new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+            if (window.HasTrayIcon) window.StartBoot();
+            else window.Show(); // Without a tray icon the window is the only exit path.
+        }
+        else
+        {
+            window.Show();
+        }
     }
 
     public bool TryGetLocalFilePath(int messageId, out string path)

@@ -43,7 +43,7 @@ Ferry includes a source-install script for daily autostart:
 npm run install:windows
 ```
 
-That builds the release executable, creates a Start menu shortcut named **Ferry**, and adds a per-user autostart entry. Windows startup opens Ferry in the notification area; launching it from the Start menu opens the window. Ferry continues serving in-process and raises a Windows notification when something arrives.
+That builds the release executable, creates a Start menu shortcut named **Ferry**, and adds a per-user autostart entry. Windows startup opens Ferry in the notification area; launching it from the Start menu opens the window. Ferry continues serving in-process and raises a Windows notification when something arrives. Directly launching `Ferry.exe` also starts in the tray; pass `--show-window` to open the main window.
 
 To remove the Start menu shortcut and autostart entry:
 
@@ -91,7 +91,7 @@ Every result is a single JSON line. Exit code `0` means success; `2` is command 
 Ferry is not running, `4` means the phone is not connected, and `5` means a requested file was
 not found or could not be read.
 
-Press `Ctrl+Alt+F` to bring Ferry to the front. The notification-area menu can also show Ferry or open a compact pairing QR window without opening the main window.
+Press `Ctrl+Alt+F` to bring Ferry to the front. The notification-area menu can also show Ferry or open a compact pairing QR window without opening the main window. The QR window closes automatically after 60 seconds.
 
 ## Security scope
 
@@ -131,7 +131,7 @@ Requires the .NET 10 SDK. Node.js 24 or newer is needed only for the browser and
 
 ```powershell
 dotnet build src/Ferry/Ferry.slnx -c Release
-dotnet run --project src/Ferry/Ferry -c Release
+dotnet run --project src/Ferry/Ferry -c Release -- --show-window
 ```
 
 Ferry opens its window and shows a pairing QR code. Scan it from the phone to connect over the LAN.

@@ -39,6 +39,7 @@ public partial class MainWindow : Window
     private readonly bool _enableAutoBoot;
     private readonly bool _enableDraftPersistence;
     private readonly bool _enableChromeEffects;
+    private bool _bootStarted;
 
     private readonly ObservableCollection<FerryMessage> _pinnedMessages = new();
     private bool _pinsExpanded;
@@ -67,18 +68,6 @@ public partial class MainWindow : Window
         _enableChromeEffects = options.EnableChromeEffects;
 
         InitializeComponent();
-        if (App.StartInTray)
-        {
-            WindowState = WindowState.Minimized;
-            ShowInTaskbar = false;
-            Loaded += (_, _) =>
-            {
-                if (_tray is { Ok: true }) Hide();
-                else ShowInTaskbar = true;
-                WindowState = WindowState.Normal;
-            };
-        }
-
         if (_enableDraftPersistence)
         {
             LoadLastReadId();
@@ -130,7 +119,7 @@ public partial class MainWindow : Window
 
         if (_enableAutoBoot)
         {
-            Loaded += async (_, _) => await BootAsync();
+            Loaded += (_, _) => StartBoot();
         }
 
         Closed += (_, _) =>
@@ -393,6 +382,15 @@ public partial class MainWindow : Window
     private DispatcherTimer? _notifyTimer;
     private bool _notifyTimerHooked;
 
+    internal bool HasTrayIcon => _tray is { Ok: true };
+
+    internal void StartBoot()
+    {
+        if (!_enableAutoBoot || _bootStarted) return;
+        _bootStarted = true;
+        _ = BootAsync();
+    }
+
     private const System.Windows.Input.ModifierKeys SummonMods =
         System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Alt;
     private const System.Windows.Input.ModifierKeys SendMods =
@@ -429,7 +427,6 @@ public partial class MainWindow : Window
             Close();
             return;
         }
-        ShowInTaskbar = true;
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();

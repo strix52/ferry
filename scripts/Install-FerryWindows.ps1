@@ -66,6 +66,7 @@ try {
   $wsh = New-Object -ComObject WScript.Shell
   $shortcut = $wsh.CreateShortcut($StartMenuShortcut)
   $shortcut.TargetPath = $InstalledExe
+  $shortcut.Arguments = "--show-window"
   $shortcut.WorkingDirectory = $AppDir
   $shortcut.IconLocation = $InstalledExe
   $shortcut.Description = "Hand off text and files between this laptop and your phone."

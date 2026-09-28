@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using QRCoder;
 
 namespace Ferry;
@@ -8,12 +9,17 @@ namespace Ferry;
 public partial class ConnectWindow : Window
 {
     private string _pairingUrl = "";
+    private readonly DispatcherTimer? _trayTimeout;
 
     public ConnectWindow(bool nearTray = false)
     {
         InitializeComponent();
         if (nearTray)
         {
+            _trayTimeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+            _trayTimeout.Tick += (_, _) => Close();
+            Loaded += (_, _) => _trayTimeout.Start();
+            Closed += (_, _) => _trayTimeout.Stop();
             WindowStartupLocation = WindowStartupLocation.Manual;
             Loaded += (_, _) =>
             {
