@@ -62,6 +62,22 @@ public sealed class FerryCliTests
     }
 
     [Fact]
+    public async Task SendText_ReportsHttpRejectionWithoutClaimingServerIsDown()
+    {
+        using var fixture = new IdentityFixture();
+        var handler = new StubHandler(request => request.RequestUri!.AbsolutePath == "/api/presence"
+            ? Json("""{"presence":[{"id":"phone-id","name":"Phone"}]}""")
+            : new HttpResponseMessage(HttpStatusCode.RequestEntityTooLarge));
+        using var error = new StringWriter();
+
+        var exit = await FerryCli.RunAsync(["send-text", "hello"], TextWriter.Null, error, handler, fixture.Root);
+
+        Assert.Equal(6, exit);
+        Assert.Contains("request_failed", error.ToString());
+        Assert.Contains("413", error.ToString());
+    }
+
+    [Fact]
     public async Task Recent_TruncatesLongTextAndReadReturnsItWhole()
     {
         using var fixture = new IdentityFixture();
@@ -88,6 +104,43 @@ public sealed class FerryCliTests
             File.WriteAllText(Path.Combine(root, "photo.jpg"), "one");
             var destination = FerryAgentClient.ResolveDestination(root + Path.DirectorySeparatorChar, "photo.jpg");
             Assert.Equal(Path.Combine(root, "photo (1).jpg"), destination);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task InvalidArguments_DoNotContactServer()
+    {
+        using var fixture = new IdentityFixture();
+        var handler = new StubHandler(_ => throw new Exception("Server should not be called"));
+        foreach (var args in new[]
+        {
+            new[] { "status", "extra" },
+            new[] { "pull", "latest", "--to" },
+            new[] { "pull", "latest", "unexpected" },
+            new[] { "pull", "latest", "--to", "" },
+        })
+        {
+            using var error = new StringWriter();
+            var exit = await FerryCli.RunAsync(args, TextWriter.Null, error, handler, fixture.Root);
+            Assert.Equal(2, exit);
+            Assert.Contains("\"code\":\"usage\"", error.ToString());
+        }
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public void ResolveDestination_UsesOnlyTheFileName()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ferry-cli-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var destination = FerryAgentClient.ResolveDestination(root + Path.DirectorySeparatorChar, "..\\outside.txt");
+            Assert.Equal(Path.Combine(root, "outside.txt"), destination);
         }
         finally
         {

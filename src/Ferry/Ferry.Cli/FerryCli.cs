@@ -9,6 +9,7 @@ internal static class FerryCli
     private const int ServerUnavailable = 3;
     private const int PhoneNotConnected = 4;
     private const int ItemNotFound = 5;
+    private const int RequestFailed = 6;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static async Task<int> RunAsync(
@@ -41,8 +42,10 @@ internal static class FerryCli
         try
         {
             var baseAddress = Environment.GetEnvironmentVariable("FERRY_URL") ?? "http://127.0.0.1:8787";
+            if (!Uri.TryCreate(baseAddress, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+                return await FailAsync(error, UsageError, "invalid_url", "FERRY_URL must be an absolute HTTP URL.");
             using var http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
-            http.BaseAddress = new Uri(baseAddress);
+            http.BaseAddress = uri;
             http.Timeout = TimeSpan.FromSeconds(10);
             var device = LoadIdentity(localAppData);
             var client = new FerryAgentClient(http, device);
@@ -51,6 +54,8 @@ internal static class FerryCli
             {
                 case "status":
                 {
+                    if (args.Length != 1)
+                        return await FailAsync(error, UsageError, "usage", "Usage: ferryctl status");
                     var devices = await client.GetOtherDevicesAsync(ct);
                     await WriteAsync(output, new
                     {
@@ -124,7 +129,7 @@ internal static class FerryCli
                 }
                 case "pull":
                 {
-                    if (args.Length is < 2 or > 4 || args.Length == 4 && args[2] != "--to")
+                    if (args.Length != 2 && (args.Length != 4 || args[2] != "--to" || string.IsNullOrWhiteSpace(args[3])))
                         return await FailAsync(error, UsageError, "usage", "Usage: ferryctl pull <id|latest> [--to <path>]");
                     var message = await client.FindFileAsync(args[1], ct);
                     if (message is null)
@@ -137,6 +142,11 @@ internal static class FerryCli
                 default:
                     return await FailAsync(error, UsageError, "unknown_command", $"Unknown command: {args[0]}");
             }
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is not null)
+        {
+            return await FailAsync(error, RequestFailed, "request_failed",
+                $"Ferry rejected the request (HTTP {(int)ex.StatusCode.Value}).");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {

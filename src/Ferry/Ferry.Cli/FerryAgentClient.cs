@@ -104,19 +104,30 @@ internal sealed class FerryAgentClient
     {
         var path = ResolveDestination(destination, message.Filename ?? $"ferry-{message.Id}");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var partial = path + ".partial-" + Guid.NewGuid().ToString("N");
         using var response = await _http.GetAsync($"/api/download/{message.Id}", HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
-        await using var input = await response.Content.ReadAsStreamAsync(ct);
-        await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        await input.CopyToAsync(output, ct);
-        return path;
+        try
+        {
+            await using (var input = await response.Content.ReadAsStreamAsync(ct))
+            await using (var output = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                await input.CopyToAsync(output, ct);
+            File.Move(partial, path);
+            return path;
+        }
+        finally
+        {
+            if (File.Exists(partial)) File.Delete(partial);
+        }
     }
 
     internal static string ResolveDestination(string destination, string filename)
     {
         var full = Path.GetFullPath(destination);
+        var safeName = Path.GetFileName(filename);
+        if (string.IsNullOrWhiteSpace(safeName)) throw new IOException("Ferry file has no usable name.");
         var path = Directory.Exists(full) || destination.EndsWith(Path.DirectorySeparatorChar)
-            ? Path.Combine(full, filename)
+            ? Path.Combine(full, safeName)
             : full;
         if (!File.Exists(path)) return path;
 

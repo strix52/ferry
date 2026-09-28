@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 
 namespace Ferry;
 
@@ -94,9 +95,9 @@ internal static class FerryPaths
             var sourceFiles = Snapshot(source);
             var stagedFiles = Snapshot(staging);
             if (sourceFiles.Count != stagedFiles.Count || sourceFiles.Any(pair =>
-                    !stagedFiles.TryGetValue(pair.Key, out var length) || length != pair.Value))
+                    !stagedFiles.TryGetValue(pair.Key, out var hash) || hash != pair.Value))
             {
-                throw new IOException("Copied Ferry data did not match the source file set.");
+                throw new IOException("Copied Ferry data did not match the source files.");
             }
 
             Directory.Move(staging, destination);
@@ -173,10 +174,16 @@ internal static class FerryPaths
         }
     }
 
-    private static Dictionary<string, long> Snapshot(string directory) =>
+    private static Dictionary<string, string> Snapshot(string directory) =>
         Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
             .ToDictionary(
                 file => Path.GetRelativePath(directory, file),
-                file => new FileInfo(file).Length,
+                file => HashFile(file),
                 StringComparer.OrdinalIgnoreCase);
+
+    private static string HashFile(string path)
+    {
+        using var input = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(input));
+    }
 }

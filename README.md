@@ -29,11 +29,11 @@ The laptop is the server; the phone is a browser tab. Ferry is deliberately smal
 
 ## Download
 
-Download `ferry-windows-x64-v0.16.0.zip` from [the latest release](https://github.com/strix52/ferry/releases/latest), verify its SHA-256 against the accompanying checksum file, and extract the whole archive before running `Ferry.exe`.
+Download the Windows x64 ZIP and its `.sha256` file from [the latest release](https://github.com/strix52/ferry/releases/latest). Verify the checksum, then extract the whole archive.
 
 The release is self-contained for 64-bit Windows. It does not need Node.js or a separately installed .NET runtime. Because the executable is not code-signed, Windows may show a reputation warning on first launch.
 
-Keep the `public` folder beside `Ferry.exe`; it contains the phone interface.
+Keep the `public` folder beside `Ferry.exe`; it contains the phone interface. Run `Ferry.exe` to start in the tray, or run `Ferry.exe --show-window` to open the desktop window. The archive also includes `ferryctl.exe` for commands from that folder.
 
 ## Windows install
 
@@ -88,8 +88,8 @@ with a ready fixed `D:` drive, using a collision-safe filename.
 
 `recent` keeps text previews to 200 characters; use `read` only when the full note is needed.
 Every result is a single JSON line. Exit code `0` means success; `2` is command usage, `3` means
-Ferry is not running, `4` means the phone is not connected, and `5` means a requested file was
-not found or could not be read.
+Ferry is not running, `4` means the phone is not connected, `5` means a requested item or file
+was not found or could not be read, and `6` means Ferry rejected the request.
 
 Press `Ctrl+Alt+F` to bring Ferry to the front. The notification-area menu can also show Ferry or open a compact pairing QR window without opening the main window. The QR window closes automatically after 30 seconds.
 

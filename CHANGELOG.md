@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.17.0 — Prepared for release
 
 - Windows file rows now have **Copy path**, which copies the full local stored-file path for
   scripts and desktop agents without exposing that path to the phone API.
@@ -11,6 +11,12 @@
   opening the UI.
 - Added authenticated `GET /api/presence`, an additive one-shot view of the existing WebSocket
   presence list for local automation.
+- Windows startup now keeps Ferry in the tray. Run `Ferry.exe --show-window` to open the main
+  window directly, or choose **Show Ferry** from the tray menu.
+- The tray menu can show a pairing QR without opening the main window. That window closes after
+  30 seconds.
+- `ferryctl` rejects malformed `status` and `pull` commands, discards interrupted file pulls,
+  and reports HTTP rejections separately from server outages.
 
 ## 0.16.0 — Crossing
 
